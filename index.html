@@ -239,7 +239,7 @@ td.tot{font-weight:700;color:var(--accent)}
 <div class="toast" id="toast" hidden></div>
 
 <script>
-const BRANCHES = ["الروضة","الروابي","طويق","لبن","الخرج","واتد"];
+let BRANCHES = [];  // loaded from the sheet's الإعدادات tab
 let P = [], PB = {};
 const $ = id => document.getElementById(id);
 // localStorage with an in-memory fallback, so PINs and baskets survive the visit even where storage is blocked
@@ -253,9 +253,9 @@ const fmtDate = d => new Date(d).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn'
 const fmtTime = d => new Date(d).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { day:'numeric', month:'short', hour:'numeric', minute:'2-digit' });
 const norm = s => (s || '').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[ً-ْ]/g,'').replace(/\s+/g,' ');
 
-let branch = BRANCHES.includes(ls.get('branch')) ? ls.get('branch') : '';
+let branch = '';
 let carts = {};
-BRANCHES.forEach(b => { try { carts[b] = JSON.parse(ls.get('cart:' + b) || '{}'); } catch { carts[b] = {}; } });
+const loadCarts = () => BRANCHES.forEach(b => { if (carts[b]) return; try { carts[b] = JSON.parse(ls.get('cart:' + b) || '{}'); } catch { carts[b] = {}; } });
 const cart = () => carts[branch] || {};
 const saveCart = () => ls.set('cart:' + branch, JSON.stringify(cart()));
 let sheetUrl = '', orders = [], ordersReady = false, adminPin = ls.get('adminPin') || '', boardTimer = null;
@@ -307,8 +307,9 @@ $('pname').addEventListener('input', e => ls.set('name', e.target.value.trim()))
 
 // Branch chips
 function renderBranches(){
+  if (!BRANCHES.length){ $('branches').innerHTML = '<span class="hint">جاري تحميل الفروع…</span>'; return; }
   $('branches').innerHTML = BRANCHES.map(b => {
-    const n = Object.keys(carts[b]).length;
+    const n = Object.keys(carts[b] || {}).length;
     return `<button class="bchip" aria-pressed="${b === branch}" data-b="${b}">${b}${n ? `<span class="n">${n}</span>` : ''}</button>`;
   }).join('');
 }
@@ -317,8 +318,24 @@ $('branches').addEventListener('click', async e => {
   const b = btn.dataset.b;
   if (!branchPin(b) && !(await askPin('branch', b))) return;
   branch = b; ls.set('branch', branch);
-  renderBranches(); renderGrid(); renderBasket();
+  renderBranches(); renderBasket(); loadProducts(b);
 });
+
+// Each branch has its own product list (a customer may carry only some items).
+const productCache = {};
+function loadProducts(b){
+  const show = list => {
+    if (b !== branch) return;
+    P = list; PB = Object.fromEntries(P.map(p => [p.b, p]));
+    P.forEach(p => p.key = norm(p.n + ' ' + p.br + ' ' + p.b));
+    $('brand').value = ''; fillBrands(); renderGrid();
+  };
+  if (productCache[b]) return show(productCache[b]);
+  P = []; PB = {}; renderGrid();
+  call('getProducts', { branch: b })
+    .then(list => { productCache[b] = list; show(list); })
+    .catch(() => toast('تعذر تحميل الأصناف. حدّثي الصفحة.'));
+}
 
 // Brand filter
 function fillBrands(){
@@ -530,14 +547,16 @@ async function loadOrders(){
   }
   if (!$('view-board').hidden && !delArmed) renderBoard();
 }
-if (branch && !branchPin(branch)) branch = '';
 renderBranches(); renderGrid(); renderBasket();
 if (new URLSearchParams(location.search).get('view') === 'board' || location.hash === '#board') showTab('board');
-call('getProducts', {}).then(list => {
-    P = list; PB = Object.fromEntries(P.map(p => [p.b, p]));
-    P.forEach(p => p.key = norm(p.n + ' ' + p.br + ' ' + p.b));
-    fillBrands(); renderGrid(); if (!$('view-board').hidden) renderBoard();
-  }).catch(() => toast('تعذر تحميل الأصناف. حدّثي الصفحة.'));
+call('getBranches', {}).then(list => {
+    BRANCHES = list; loadCarts();
+    const saved = ls.get('branch');
+    branch = BRANCHES.includes(saved) && branchPin(saved) ? saved : '';
+    renderBranches(); renderBasket();
+    if (branch) loadProducts(branch); else renderGrid();
+    if (!$('view-board').hidden) renderBoard();
+  }).catch(() => toast('تعذر تحميل الفروع. حدّثي الصفحة.'));
 </script>
 
 </body>
