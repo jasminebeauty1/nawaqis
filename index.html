@@ -538,13 +538,13 @@ $('view-board').addEventListener('click', async e => {
     else { toast('تعذر التحديث، حاول مرة أخرى'); ab.disabled = false; }
   }
 });
-// One order as an Excel file: branch, barcode, quantity (barcodes kept as text).
+// One order as an Excel file: branch, barcode, item name, quantity (barcodes kept as text).
 function orderXlsx(o){
   if (!window.XLSX){ toast('تعذر تجهيز ملف Excel. حدّث الصفحة.'); return; }
-  const rows = [['الفرع', 'الباركود', 'الكمية'], ...(o.items || []).map(i => [o.branch, String(i.b), +i.q || 0])];
+  const rows = [['الفرع', 'الباركود', 'اسم الصنف', 'الكمية'], ...(o.items || []).map(i => [o.branch, String(i.b), PB[i.b]?.n || i.n || '', +i.q || 0])];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   for (let r = 1; r < rows.length; r++) ws[XLSX.utils.encode_cell({ r, c: 1 })] = { t: 's', v: rows[r][1] };
-  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 8 }];
+  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 55 }, { wch: 8 }];
   const wb = XLSX.utils.book_new();
   wb.Workbook = { Views: [{ RTL: true }] };
   XLSX.utils.book_append_sheet(wb, ws, 'الطلب');
