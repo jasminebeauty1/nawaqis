@@ -7,6 +7,12 @@
 <meta charset="utf-8">
 <style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>نواقص فروع جاسمين</title>
+<meta name="theme-color" content="#292663">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="نواقص جاسمين">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -131,6 +137,27 @@ main{padding-block:16px 120px}
 .hint{font-size:12.5px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;max-width:calc(100% - 32px);text-align:center}
 
+/* Daily sales */
+.scard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px}
+.sprog{height:12px;background:var(--sunk);border-radius:999px;overflow:hidden}
+.sprog i{display:block;height:100%;background:var(--jasmine);border-radius:999px}
+.slist{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px}
+@media (min-width:760px){.slist{grid-template-columns:1fr 1fr}}
+.srow{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px}
+.srow.has{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.srow img,.srow .ni{width:48px;height:48px;object-fit:contain;background:#fff;border-radius:8px}
+.srow .t{min-width:0;display:flex;flex-direction:column}
+.srow .nm{font-size:13.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.srow small{font-size:11.5px;color:var(--muted)}
+.srow .step{padding:0}
+.srow .step input{width:52px;flex:none}
+.sday{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.stbl{width:100%;border-collapse:collapse;font-size:14px}
+.stbl th,.stbl td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right}
+.stbl th{color:var(--muted);font-weight:500;font-size:12.5px}
+.btn.off{opacity:.45}
+.tabs{flex-wrap:wrap}
+
 /* Purchasing board */
 .board{display:flex;flex-direction:column;gap:18px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -189,6 +216,7 @@ td.tot{font-weight:700;color:var(--accent)}
       </div>
       <div class="tabs" role="tablist">
         <button role="tab" id="tab-order" aria-selected="true">طلب نواقص</button>
+        <button role="tab" id="tab-sales" aria-selected="false">المبيعات اليومية</button>
         <button role="tab" id="tab-board" aria-selected="false">لوحة المشتريات</button>
       </div>
     </div>
@@ -212,8 +240,20 @@ td.tot{font-weight:700;color:var(--accent)}
     <div id="grid" class="grid" style="margin-top:12px"></div>
     <div id="empty" class="notice" hidden>لا توجد أصناف بهذا البحث.</div>
   </section>
+  <section id="view-sales" hidden></section>
   <section id="view-board" class="board" hidden></section>
+  <div class="notice" id="installBox" hidden style="margin-top:16px"><button class="btn ghost" id="installBtn" hidden>📲 تثبيت التطبيق على الجوال</button><span id="iosHint" hidden>لتثبيته كتطبيق: اضغطي زر المشاركة تحت ثم «إضافة إلى الشاشة الرئيسية»</span></div>
 </main>
+
+<div class="basket" id="sbar" hidden>
+  <div class="wrap">
+    <div class="sum"><b id="sTop">0 صنف · 0 حبة</b><span id="sSub"></span></div>
+    <div style="display:flex;gap:8px">
+      <a class="btn wa" id="sWa" href="#" target="_blank" rel="noopener">واتساب</a>
+      <button class="btn" id="sSave">حفظ</button>
+    </div>
+  </div>
+</div>
 
 <div class="basket" id="basket">
   <div class="wrap">
@@ -342,14 +382,16 @@ function openBranch(b){
   branch = b; ls.set('branch', b);
   if (!carts[b]){ try { carts[b] = JSON.parse(ls.get('cart:' + b) || '{}'); } catch { carts[b] = {}; } }
   renderBranches(); renderBasket(); loadProducts(b);
+  if (curTab === 'sales') showTab('sales');
 }
 function logout(){
   if (branch) ls.set('pin:' + branch, '');
   branch = ''; ls.set('branch', ''); P = []; PB = {};
   renderBranches(); renderGrid(); renderBasket();
+  if (curTab === 'sales') showTab('sales');
 }
 document.addEventListener('click', e => {
-  if (e.target.id === 'loginBtn' || e.target.id === 'loginBtn2') askPin('branch');
+  if (e.target.id === 'loginBtn' || e.target.id === 'loginBtn2' || e.target.id === 'loginBtn3') askPin('branch');
   else if (e.target.id === 'switchBranch'){ logout(); askPin('branch'); }
 });
 
@@ -365,6 +407,7 @@ function loadProducts(b){
     const gone = Object.keys(cart()).filter(k => PB[k]?.out);
     if (gone.length){ gone.forEach(k => delete cart()[k]); saveCart(); renderBranches(); renderBasket(); toast(`انشال ${gone.length} صنف من طلبك لأنه صار غير متوفر`); }
     $('brand').value = ''; fillBrands(); renderGrid();
+    if (curTab === 'sales') renderSales();
   };
   if (productCache[b]) return show(productCache[b]);
   P = []; PB = {}; renderGrid();
@@ -500,15 +543,20 @@ let toastT;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2800); }
 
 // Tabs
+let curTab = 'order';
 function showTab(which){
-  const board = which === 'board';
-  $('tab-order').setAttribute('aria-selected', !board); $('tab-board').setAttribute('aria-selected', board);
-  $('view-order').hidden = board; $('orderTools').style.display = board ? 'none' : 'flex';
-  $('view-board').hidden = !board; $('basket').hidden = board;
+  curTab = which;
+  const board = which === 'board', sales = which === 'sales';
+  $('tab-order').setAttribute('aria-selected', which === 'order'); $('tab-sales').setAttribute('aria-selected', sales); $('tab-board').setAttribute('aria-selected', board);
+  $('view-order').hidden = which !== 'order'; $('orderTools').style.display = which === 'order' ? 'flex' : 'none';
+  $('view-sales').hidden = !sales; $('sbar').hidden = !sales || !branch;
+  $('view-board').hidden = !board; $('basket').hidden = which !== 'order';
   clearInterval(boardTimer);
   if (board){ renderBoard(); loadOrders(); boardTimer = setInterval(() => { if (!document.hidden) loadOrders(); }, 30000); }
+  if (sales) openSales();
 }
 $('tab-order').addEventListener('click', () => showTab('order'));
+$('tab-sales').addEventListener('click', () => showTab('sales'));
 $('tab-board').addEventListener('click', () => showTab('board'));
 
 // Purchasing board
@@ -607,6 +655,156 @@ async function loadOrders(){
   }
   if (!$('view-board').hidden && !delArmed) renderBoard();
 }
+// ---------- Daily sales: pieces sold per item, monthly target, no commission ----------
+// Unavailable-in-warehouse items stay open here, since the branch may still have them on the shelf.
+let sDate = todayKey(), sQty = {}, sMonth = todayKey().slice(0, 7), sRep = null, sQ = '', sLoading = false;
+const sTotals = () => { const ks = Object.keys(sQty); return { n: ks.length, qty: ks.reduce((s, k) => s + sQty[k], 0) }; };
+const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const monthName = m => MONTHS_AR[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4);
+function monthOptions(sel){
+  let [y, m] = todayKey().slice(0, 7).split('-').map(Number), out = '';
+  for (let i = 0; i < 12; i++){ const v = y + '-' + String(m).padStart(2, '0'); out += `<option value="${v}"${v === sel ? ' selected' : ''}>${monthName(v)}</option>`; if (--m === 0){ m = 12; y--; } }
+  return out;
+}
+function progressHTML(pieces, target){
+  const pct = target ? pieces / target : 0;
+  return `<div class="sprog"><i style="width:${Math.min(100, pct * 100)}%"></i></div>
+    <div class="hint" style="display:flex;justify-content:space-between"><span><b style="color:var(--ink)">${pieces}</b> من ${target} حبة</span><span><b style="color:var(--ink)">${Math.round(pct * 100)}%</b>${pieces < target ? ` · باقي ${target - pieces}` : ' · حققتي التارجت ✓'}</span></div>`;
+}
+
+async function openSales(){
+  renderSales();
+  if (!branch) return;
+  sLoading = true; renderSales();
+  try {
+    const [d, r] = await Promise.all([
+      call('salesGetDay', { branch, pin: branchPin(branch), date: sDate }),
+      call('salesReport', { branch, pin: branchPin(branch), month: sMonth })
+    ]);
+    if (d.error || r.error) throw Object.assign(new Error(d.error || r.error), { status: d.status || r.status });
+    sQty = d.qty || {}; sRep = r;
+  } catch (e) {
+    if (e.status === 401){ toast('رمز الفرع تغيّر. اكتبي الرمز الجديد.'); logout(); askPin('branch'); return; }
+    toast('تعذر تحميل المبيعات. تأكدي من الإنترنت.');
+  }
+  sLoading = false; renderSales();
+}
+
+function renderSales(){
+  const v = $('view-sales');
+  $('sbar').hidden = curTab !== 'sales' || !branch;
+  if (!branch){
+    v.innerHTML = `<div class="notice"><b>اكتبي رمز فرعك</b> عشان تسجلين مبيعات اليوم.<br><button class="btn" id="loginBtn3" style="margin-top:10px">إدخال الرمز</button></div>${adminSalesHTML()}`;
+    return;
+  }
+  const me = sRep && sRep.branches && sRep.branches[branch];
+  const list = P.filter(p => !sQ || p.key.includes(norm(sQ)));
+  v.innerHTML = `
+  <div class="scard">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="font-size:16px">مبيعات فرع ${esc(branch)} — ${sRep ? monthName(sRep.month) : ''}</h3>
+      <select id="sMonth" class="brandsel">${monthOptions(sMonth)}</select></div>
+    ${me ? progressHTML(me.pieces, sRep.target) : '<div class="hint">جاري التحميل…</div>'}
+  </div>
+  <div class="scard">
+    <div class="tools">
+      <label class="field" style="flex:0 0 170px"><span class="label">تاريخ البيع</span><input type="date" id="sDate" value="${sDate}" max="${todayKey()}"></label>
+      <label class="search" style="align-self:end"><input id="sQ" type="search" placeholder="ابحثي باسم الصنف أو الباركود" value="${esc(sQ)}" autocomplete="off"></label>
+    </div>
+    <div class="hint" style="margin-top:8px">${sLoading ? 'جاري التحميل…' : 'اكتبي كم حبة انباعت من كل صنف في هذا اليوم ثم اضغطي «حفظ». تقدرين ترجعين وتعدّلين.'}</div>
+  </div>
+  <div class="slist" id="slist">${P.length ? list.map(p => { const q = sQty[p.b] || 0;
+    return `<div class="srow${q ? ' has' : ''}" data-b="${p.b}">${p.img ? `<img src="${p.img}" alt="" loading="lazy">` : '<div class="ni"></div>'}
+      <div class="t"><span class="nm">${esc(p.n)}</span><small>${esc(p.br)} · ${p.b}</small></div>
+      <div class="step"><button data-s="-1" aria-label="إنقاص">−</button><input inputmode="numeric" value="${q || ''}" placeholder="0" aria-label="الكمية المباعة"><button class="plus" data-s="1" aria-label="زيادة">+</button></div></div>`; }).join('') || '<div class="notice">لا توجد أصناف بهذا البحث.</div>'
+    : '<div class="notice">جاري تحميل الأصناف…</div>'}</div>
+  ${me && me.pieces ? `<div class="scard"><h3 style="font-size:15px;margin-bottom:6px">أيام الشهر</h3>${Object.keys(me.days).sort().reverse().map(d => `<div class="sday"><span>${d}</span><b>${me.days[d]} حبة</b></div>`).join('')}</div>` : ''}
+  ${adminSalesHTML()}`;
+  $('sMonth').onchange = e => { sMonth = e.target.value; openSales(); };
+  $('sDate').onchange = e => { sDate = e.target.value || todayKey(); openSales(); };
+  $('sQ').oninput = e => { sQ = e.target.value; const pos = e.target.selectionStart; renderSales(); const i = $('sQ'); i.focus(); i.setSelectionRange(pos, pos); };
+  sBar();
+}
+function setSQty(code, q){
+  q = Math.max(0, Math.min(9999, Math.floor(+q || 0)));
+  if (q) sQty[code] = q; else delete sQty[code];
+  const row = $('slist').querySelector(`.srow[data-b="${code}"]`);
+  if (row){ row.classList.toggle('has', !!q); const inp = row.querySelector('input'); if (document.activeElement !== inp) inp.value = q || ''; }
+  sBar();
+}
+$('view-sales').addEventListener('click', e => {
+  const b = e.target.closest('[data-s]'); if (!b) return;
+  const code = b.closest('.srow').dataset.b; setSQty(code, (sQty[code] || 0) + +b.dataset.s);
+});
+$('view-sales').addEventListener('input', e => {
+  if (!e.target.closest('.srow')) return;
+  e.target.value = e.target.value.replace(/[^\d٠-٩]/g,'').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  setSQty(e.target.closest('.srow').dataset.b, e.target.value);
+});
+function salesText(){
+  const ks = Object.keys(sQty), t = sTotals();
+  return [`*مبيعات فرع ${branch}*`, `التاريخ: ${fmtDate(sDate + 'T12:00')}`, '',
+    ...ks.map((k, i) => `${i + 1}) ${PB[k]?.n || k} — ${sQty[k]}`), '', `الإجمالي: ${t.n} صنف / ${t.qty} حبة`].join('\n');
+}
+function sBar(){
+  const t = sTotals();
+  $('sTop').textContent = `${t.n} صنف · ${t.qty} حبة`;
+  $('sSub').textContent = branch ? `مبيعات ${sDate === todayKey() ? 'اليوم' : sDate}` : '';
+  $('sWa').href = 'https://wa.me/?text=' + encodeURIComponent(salesText());
+  $('sWa').classList.toggle('off', !t.n);
+}
+$('sWa').addEventListener('click', e => { if (!sTotals().n){ e.preventDefault(); toast('ما فيه مبيعات تنرسل'); } });
+$('sSave').addEventListener('click', async () => {
+  const btn = $('sSave'); btn.disabled = true; btn.textContent = 'جاري الحفظ…';
+  try {
+    const r = await call('salesSaveDay', { branch, pin: branchPin(branch), date: sDate, qty: sQty, promoter: $('pname').value.trim() || ls.get('name') || '' });
+    if (r.error) throw Object.assign(new Error(r.error), { status: r.status });
+    toast(r.saved ? `تم حفظ المبيعات ✓ ${r.pieces} حبة` : 'تم الحفظ ✓ (بدون مبيعات لهذا اليوم)');
+    const rep = await call('salesReport', { branch, pin: branchPin(branch), month: sMonth });
+    if (!rep.error){ sRep = rep; renderSales(); }
+  } catch (e) {
+    toast(e.status === 401 ? 'رمز الفرع تغيّر. اكتبي الرمز الجديد.' : 'تعذر الحفظ الآن. تأكدي من الإنترنت وحاولي مرة أخرى.');
+  } finally { btn.disabled = false; btn.textContent = 'حفظ'; }
+});
+
+// Board PIN: every branch's month, with an Excel download.
+let aRep = null, aMonth = todayKey().slice(0, 7);
+function adminSalesHTML(){
+  if (!aRep) return `<div style="text-align:center;margin-top:18px"><button class="btn ghost sm" id="sAdmin">تقرير مبيعات كل الفروع (للمسؤول)</button></div>`;
+  const B = Object.entries(aRep.branches).sort((a, b) => b[1].pieces - a[1].pieces), T = aRep.target;
+  return `<div class="scard" style="margin-top:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="font-size:16px">مبيعات كل الفروع</h3>
+      <div style="display:flex;gap:8px"><select id="aMonth" class="brandsel">${monthOptions(aMonth)}</select><button class="btn sm" id="aXl">Excel</button></div></div>
+    <div style="overflow-x:auto"><table class="stbl"><tr><th>الفرع</th><th>الحبات</th><th>من التارجت (${T})</th></tr>
+      ${B.map(([n, o]) => `<tr><td>${esc(n)}</td><td><b>${o.pieces}</b></td><td>${Math.round(o.pieces / T * 100)}%</td></tr>`).join('')}
+      <tr><td><b>المجموع</b></td><td><b>${B.reduce((s, [, o]) => s + o.pieces, 0)}</b></td><td></td></tr></table></div></div>`;
+}
+async function loadAdminSales(){
+  if (!adminPin && !(await askPin('admin'))) return;
+  const r = await call('salesReport', { admin: true, pin: adminPin, month: aMonth }).catch(() => null);
+  if (!r || r.error){ if (r && r.status === 401){ adminPin = ''; ls.set('adminPin', ''); } toast('تعذر تحميل تقرير المبيعات'); return; }
+  aRep = r; renderSales();
+}
+$('view-sales').addEventListener('click', e => {
+  if (e.target.id === 'sAdmin') loadAdminSales();
+  else if (e.target.id === 'aXl' && aRep) salesXlsx(aRep);
+});
+$('view-sales').addEventListener('change', e => { if (e.target.id === 'aMonth'){ aMonth = e.target.value; loadAdminSales(); } });
+function salesXlsx(r){
+  const wb = XLSX.utils.book_new(), B = Object.entries(r.branches);
+  const sheet = (aoa, name) => { const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!views'] = [{ RTL: true }]; ws['!cols'] = aoa[0].map((_, i) => ({ wch: i === 2 ? 50 : 16 })); XLSX.utils.book_append_sheet(wb, ws, name); };
+  sheet([['الفرع', 'الحبات', 'التارجت', 'نسبة التارجت'], ...B.map(([n, o]) => [n, o.pieces, r.target, Math.round(o.pieces / r.target * 1000) / 10 + '%'])], 'ملخص الفروع');
+  sheet([['الفرع', 'الباركود', 'الصنف', 'البراند', 'الحبات'], ...B.flatMap(([n, o]) => Object.entries(o.items).sort((a, b) => b[1].q - a[1].q).map(([bc, x]) => [n, bc, x.n, x.br, x.q]))], 'الأصناف');
+  sheet([['التاريخ', 'الفرع', 'الحبات'], ...B.flatMap(([n, o]) => Object.keys(o.days).sort().map(d => [d, n, o.days[d]]))], 'يومي');
+  XLSX.writeFile(wb, `مبيعات الفروع ${r.month}.xlsx`);
+}
+
+// ---------- Install as an app ----------
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('installBox').hidden = false; $('installBtn').hidden = false; });
+$('installBtn').addEventListener('click', async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $('installBox').hidden = true; });
+if (!(matchMedia('(display-mode: standalone)').matches || navigator.standalone) && /iphone|ipad|ipod/i.test(navigator.userAgent)){ $('installBox').hidden = false; $('iosHint').hidden = false; }
+
 renderBranches(); renderGrid(); renderBasket();
 if (new URLSearchParams(location.search).get('view') === 'board' || location.hash === '#board') showTab('board');
 call('getBranches', {}).then(list => {
