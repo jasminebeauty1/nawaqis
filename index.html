@@ -238,6 +238,7 @@ td.tot{font-weight:700;color:var(--accent)}
 </div>
 <div class="toast" id="toast" hidden></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 let BRANCHES = [];  // loaded from the sheet's الإعدادات tab
 let P = [], PB = {};
@@ -506,7 +507,7 @@ function renderBoard(){
       <ul>${(o.items || []).map(i => `<li><span>${esc(PB[i.b]?.n || i.n)}</span><span>${+i.q || 0}</span></li>`).join('')}</ul>
       ${o.note ? `<div class="note">${esc(o.note)}</div>` : ''}
       <div class="meta">${o.count} صنف · ${o.qty} قطعة</div>
-      <div class="acts"><button class="btn sm ${o.status === 'done' ? 'ghost' : ''}" data-act="toggle">${o.status === 'done' ? 'إرجاع إلى جديد' : 'تم الشراء'}</button><button class="btn sm danger" data-act="del">${delArmed === o.id ? 'تأكيد الحذف' : 'حذف'}</button></div>
+      <div class="acts"><button class="btn sm ${o.status === 'done' ? 'ghost' : ''}" data-act="toggle">${o.status === 'done' ? 'إرجاع إلى جديد' : 'تم الشراء'}</button><button class="btn sm ghost" data-act="xlsx">Excel</button><button class="btn sm danger" data-act="del">${delArmed === o.id ? 'تأكيد الحذف' : 'حذف'}</button></div>
     </article>`).join('');
   v.innerHTML = `
     <div class="filters">${seg('range', fRange, [['today','اليوم'],['week','آخر 7 أيام'],['all','الكل']])}${seg('status', fStatus, [['new','جديد'],['done','تم الشراء'],['all','الكل']])}</div>
@@ -522,6 +523,7 @@ $('view-board').addEventListener('click', async e => {
   if (e.target.id === 'adminLogin'){ if (await askPin('admin')){ ordersReady = false; renderBoard(); loadOrders(); } return; }
   const ab = e.target.closest('[data-act]'); if (!ab) return;
   const id = ab.closest('.order').dataset.id, o = orders.find(x => x.id === id); if (!o) return;
+  if (ab.dataset.act === 'xlsx') return orderXlsx(o);
   try {
     if (ab.dataset.act === 'toggle'){
       ab.disabled = true;
@@ -536,6 +538,19 @@ $('view-board').addEventListener('click', async e => {
     else { toast('تعذر التحديث، حاول مرة أخرى'); ab.disabled = false; }
   }
 });
+// One order as an Excel file: branch, barcode, quantity (barcodes kept as text).
+function orderXlsx(o){
+  if (!window.XLSX){ toast('تعذر تجهيز ملف Excel. حدّث الصفحة.'); return; }
+  const rows = [['الفرع', 'الباركود', 'الكمية'], ...(o.items || []).map(i => [o.branch, String(i.b), +i.q || 0])];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  for (let r = 1; r < rows.length; r++) ws[XLSX.utils.encode_cell({ r, c: 1 })] = { t: 's', v: rows[r][1] };
+  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 8 }];
+  const wb = XLSX.utils.book_new();
+  wb.Workbook = { Views: [{ RTL: true }] };
+  XLSX.utils.book_append_sheet(wb, ws, 'الطلب');
+  XLSX.writeFile(wb, `طلب ${o.branch} ${String(o.createdAt || '').slice(0, 10)}.xlsx`);
+}
+
 async function loadOrders(){
   if (!adminPin) return;
   try {
