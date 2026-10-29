@@ -194,7 +194,7 @@ td.tot{font-weight:700;color:var(--accent)}
     </div>
     <div id="orderTools" style="display:flex;flex-direction:column;gap:10px">
       <div>
-        <div class="label" style="margin-bottom:5px">اختاري الفرع</div>
+        <div class="label" style="margin-bottom:5px">الفرع</div>
         <div class="branches" id="branches"></div>
       </div>
       <div class="tools">
@@ -208,7 +208,7 @@ td.tot{font-weight:700;color:var(--accent)}
 
 <main class="wrap">
   <section id="view-order">
-    <div id="pickBranch" class="notice"><b>ابدئي باختيار الفرع</b> من الأعلى، ثم حددي كمية كل صنف ناقص.</div>
+    <div id="pickBranch" class="notice"><b>اكتبي رمز فرعك</b> وبيفتح لك فرعك وأصنافه على طول.<br><button class="btn" id="loginBtn2" style="margin-top:10px">إدخال الرمز</button></div>
     <div id="grid" class="grid" style="margin-top:12px"></div>
     <div id="empty" class="notice" hidden>لا توجد أصناف بهذا البحث.</div>
   </section>
@@ -283,7 +283,7 @@ function stkBadge(b, need){
 }
 let sheetUrl = '', orders = [], ordersReady = false, adminPin = ls.get('adminPin') || '', boardTimer = null;
 const branchPin = b => ls.get('pin:' + b) || '';
-const FN = { 'auth': 'auth', 'orders': 'submitOrder', 'admin/orders': 'adminOrders', 'admin/update': 'adminUpdate', 'admin/delete': 'adminDelete' };
+const FN = { 'login': 'login', 'auth': 'auth', 'orders': 'submitOrder', 'admin/orders': 'adminOrders', 'admin/update': 'adminUpdate', 'admin/delete': 'adminDelete' };
 const API_URL = 'https://script.google.com/macros/s/AKfycbzhypLGX6X1_Ui_OEy_yinxFZxohqI8p9oULMkA0Q20n8GRuYfZZVquoxZdjX8bYRqY/exec';
 async function call(fn, body){
   const r = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ fn, body }), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, credentials: 'omit', redirect: 'follow' });
@@ -302,7 +302,7 @@ let pinCtx = null;
 function askPin(kind, target){
   return new Promise(res => {
     pinCtx = { kind, target, res };
-    $('pinTitle').textContent = kind === 'admin' ? 'رمز لوحة المشتريات' : `رمز فرع ${target}`;
+    $('pinTitle').textContent = kind === 'admin' ? 'رمز لوحة المشتريات' : 'رمز فرعك';
     $('pinSub').textContent = kind === 'admin' ? 'خاص بمسؤول المشتريات' : 'الرمز يعطيك إياه المسؤول، ويُطلب مرة واحدة فقط على هذا الجوال';
     $('pinInput').value = ''; $('pinErr').textContent = '';
     $('pinSheet').hidden = false; setTimeout(() => $('pinInput').focus(), 50);
@@ -317,7 +317,11 @@ $('pinForm').addEventListener('submit', async e => {
   $('pinOk').disabled = true;
   try {
     if (pinCtx.kind === 'admin'){ await api('auth', { admin: true, pin }); adminPin = pin; ls.set('adminPin', pin); }
-    else { await api('auth', { branch: pinCtx.target, pin }); ls.set('pin:' + pinCtx.target, pin); }
+    else {
+      // The PIN alone identifies the branch.
+      const r = await api('login', { pin });
+      ls.set('pin:' + r.branch, pin); openBranch(r.branch);
+    }
     closePin(true);
   } catch (err) {
     $('pinErr').textContent = err.status === 429 ? 'محاولات كثيرة. انتظري ربع ساعة ثم حاولي مرة أخرى.' : err.status === 401 ? 'الرمز غير صحيح.' : 'تعذر الاتصال. تأكدي من الإنترنت.';
@@ -328,20 +332,25 @@ $('today').textContent = fmtDate(Date.now());
 $('pname').value = ls.get('name') || '';
 $('pname').addEventListener('input', e => ls.set('name', e.target.value.trim()));
 
-// Branch chips
+// The promoter only sees her own branch; the list of branches stays hidden.
 function renderBranches(){
-  if (!BRANCHES.length){ $('branches').innerHTML = '<span class="hint">جاري تحميل الفروع…</span>'; return; }
-  $('branches').innerHTML = BRANCHES.map(b => {
-    const n = Object.keys(carts[b] || {}).length;
-    return `<button class="bchip" aria-pressed="${b === branch}" data-b="${b}">${b}${n ? `<span class="n">${n}</span>` : ''}</button>`;
-  }).join('');
+  if (!branch){ $('branches').innerHTML = '<button class="btn sm" id="loginBtn">إدخال رمز الفرع</button>'; return; }
+  const n = Object.keys(carts[branch] || {}).length;
+  $('branches').innerHTML = `<span class="bchip" aria-pressed="true">${esc(branch)}${n ? `<span class="n">${n}</span>` : ''}</span><button class="btn sm ghost" id="switchBranch">تغيير الفرع</button>`;
 }
-$('branches').addEventListener('click', async e => {
-  const btn = e.target.closest('.bchip'); if (!btn) return;
-  const b = btn.dataset.b;
-  if (!branchPin(b) && !(await askPin('branch', b))) return;
-  branch = b; ls.set('branch', branch);
+function openBranch(b){
+  branch = b; ls.set('branch', b);
+  if (!carts[b]){ try { carts[b] = JSON.parse(ls.get('cart:' + b) || '{}'); } catch { carts[b] = {}; } }
   renderBranches(); renderBasket(); loadProducts(b);
+}
+function logout(){
+  if (branch) ls.set('pin:' + branch, '');
+  branch = ''; ls.set('branch', ''); P = []; PB = {};
+  renderBranches(); renderGrid(); renderBasket();
+}
+document.addEventListener('click', e => {
+  if (e.target.id === 'loginBtn' || e.target.id === 'loginBtn2') askPin('branch');
+  else if (e.target.id === 'switchBranch'){ logout(); askPin('branch'); }
 });
 
 // Each branch has its own product list (a customer may carry only some items).
@@ -482,7 +491,7 @@ $('saveDb').addEventListener('click', async () => {
     if (res && res.dropped) delete productCache[branch];
   } catch (e) {
     if (e.code === 'out_of_stock'){ toast('كل الأصناف في طلبك صارت غير متوفرة.'); delete productCache[branch]; loadProducts(branch); return; }
-    if (e.status === 401){ ls.set('pin:' + branch, ''); $('sheet').hidden = true; toast('رمز الفرع تغيّر. اكتبي الرمز الجديد ثم أرسلي مرة أخرى.'); if (await askPin('branch', branch)) openSheet(); }
+    if (e.status === 401){ const b = branch; $('sheet').hidden = true; toast('رمز الفرع تغيّر. اكتبي الرمز الجديد ثم أرسلي مرة أخرى.'); ls.set('pin:' + b, ''); if (await askPin('branch') && branch === b) openSheet(); }
     else toast('تعذر الحفظ الآن. تأكدي من الإنترنت وحاولي مرة أخرى، أو أرسلي عبر واتساب.');
   } finally { btn.disabled = false; btn.textContent = 'حفظ الطلب في النظام'; }
 });
@@ -603,9 +612,8 @@ if (new URLSearchParams(location.search).get('view') === 'board' || location.has
 call('getBranches', {}).then(list => {
     BRANCHES = list; loadCarts();
     const saved = ls.get('branch');
-    branch = BRANCHES.includes(saved) && branchPin(saved) ? saved : '';
-    renderBranches(); renderBasket();
-    if (branch) loadProducts(branch); else renderGrid();
+    if (BRANCHES.includes(saved) && branchPin(saved)) openBranch(saved);
+    else { branch = ''; renderBranches(); renderBasket(); renderGrid(); if ($('view-board').hidden) askPin('branch'); }
     if (!$('view-board').hidden) renderBoard();
   }).catch(() => toast('تعذر تحميل الفروع. حدّثي الصفحة.'));
 </script>
