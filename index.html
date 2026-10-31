@@ -80,6 +80,11 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .search input{width:100%;border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 38px 9px 12px}
 .search svg{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--muted)}
 .brandsel{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 10px;max-width:100%}
+.bchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.bchips::-webkit-scrollbar{display:none}
+.bchips button{flex:none;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.bchips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.bchips button small{font-size:11.5px;opacity:.7;margin-inline-start:4px;font-variant-numeric:tabular-nums}
 .onlycart{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--muted);user-select:none}
 
 main{padding-block:16px 120px}
@@ -227,9 +232,9 @@ td.tot{font-weight:700;color:var(--accent)}
       </div>
       <div class="tools">
         <label class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="ابحثي باسم الصنف أو الباركود" autocomplete="off"></label>
-        <select id="brand" class="brandsel" aria-label="البراند"></select>
         <label class="onlycart"><input type="checkbox" id="onlyCart"> المطلوب فقط</label>
       </div>
+      <div class="bchips" id="brandChips" role="group" aria-label="البراند"></div>
     </div>
   </div>
 </header>
@@ -406,7 +411,7 @@ function loadProducts(b){
     // Drop items that ran out from a basket saved earlier.
     const gone = Object.keys(cart()).filter(k => PB[k]?.out);
     if (gone.length){ gone.forEach(k => delete cart()[k]); saveCart(); renderBranches(); renderBasket(); toast(`انشال ${gone.length} صنف من طلبك لأنه صار غير متوفر`); }
-    $('brand').value = ''; fillBrands(); renderGrid();
+    selBrand = ''; sBrand = ''; fillBrands(); renderGrid();
     if (curTab === 'sales') renderSales();
   };
   if (productCache[b]) return show(productCache[b]);
@@ -416,12 +421,24 @@ function loadProducts(b){
     .catch(() => toast('تعذر تحميل الأصناف. حدّثي الصفحة.'));
 }
 
-// Brand filter
-function fillBrands(){
-  const brands = [...new Set(P.map(p => p.br))];
-$('brand').innerHTML = `<option value="">كل البراندات (${P.length})</option>` + brands.map(b => `<option value="${b}">${b} (${P.filter(p => p.br === b).length})</option>`).join('');
+// Brand chips: «الكل» plus one button per brand, shared look in the shortages and sales tabs.
+let selBrand = '', sBrand = '';
+function brandChipsHTML(cur){
+  const counts = {};
+  P.forEach(p => { counts[p.br] = (counts[p.br] || 0) + 1; });
+  return [['', 'الكل', P.length], ...Object.entries(counts).map(([b, n]) => [b, b, n])]
+    .map(([v, label, n]) => `<button type="button" data-brand="${esc(v)}" aria-pressed="${v === cur}">${esc(label)}<small>${n}</small></button>`).join('');
 }
-['q','brand','onlyCart'].forEach(id => $(id).addEventListener('input', renderGrid));
+function fillBrands(){
+  const sl = $('brandChips').scrollLeft;
+  $('brandChips').innerHTML = P.length ? brandChipsHTML(selBrand) : '';
+  $('brandChips').scrollLeft = sl;
+}
+$('brandChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-brand]'); if (!b) return;
+  selBrand = b.dataset.brand; fillBrands(); renderGrid();
+});
+['q','onlyCart'].forEach(id => $(id).addEventListener('input', renderGrid));
 
 const noImg = `<div class="noimg"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg>بدون صورة</div>`;
 function cardHTML(p){
@@ -442,7 +459,7 @@ function renderGrid(){
   $('grid').hidden = !branch;
   if (!branch){ $('empty').hidden = true; return; }
   if (!P.length){ $('grid').innerHTML = '<div class="notice" style="grid-column:1/-1">جاري تحميل الأصناف…</div>'; $('empty').hidden = true; return; }
-  const q = norm($('q').value.trim()), br = $('brand').value, only = $('onlyCart').checked;
+  const q = norm($('q').value.trim()), br = selBrand, only = $('onlyCart').checked;
   const list = P.filter(p => (!br || p.br === br) && (!q || p.key.includes(q)) && (!only || cart()[p.b]));
   $('grid').innerHTML = list.map(cardHTML).join('');
   $('empty').hidden = list.length > 0;
@@ -698,7 +715,8 @@ function renderSales(){
     return;
   }
   const me = sRep && sRep.branches && sRep.branches[branch];
-  const list = P.filter(p => !sQ || p.key.includes(norm(sQ)));
+  const list = P.filter(p => (!sBrand || p.br === sBrand) && (!sQ || p.key.includes(norm(sQ))));
+  const chipsScroll = $('sBrandChips') ? $('sBrandChips').scrollLeft : 0;
   v.innerHTML = `
   <div class="scard">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="font-size:16px">مبيعات فرع ${esc(branch)} — ${sRep ? monthName(sRep.month) : ''}</h3>
@@ -710,6 +728,7 @@ function renderSales(){
       <label class="field" style="flex:0 0 170px"><span class="label">تاريخ البيع</span><input type="date" id="sDate" value="${sDate}" max="${todayKey()}"></label>
       <label class="search" style="align-self:end"><input id="sQ" type="search" placeholder="ابحثي باسم الصنف أو الباركود" value="${esc(sQ)}" autocomplete="off"></label>
     </div>
+    ${P.length ? `<div class="bchips" id="sBrandChips" role="group" aria-label="البراند" style="margin-top:10px">${brandChipsHTML(sBrand)}</div>` : ''}
     <div class="hint" style="margin-top:8px">${sLoading ? 'جاري التحميل…' : 'اكتبي كم حبة انباعت من كل صنف في هذا اليوم ثم اضغطي «حفظ». تقدرين ترجعين وتعدّلين.'}</div>
   </div>
   <div class="slist" id="slist">${P.length ? list.map(p => { const q = sQty[p.b] || 0;
@@ -722,6 +741,10 @@ function renderSales(){
   $('sMonth').onchange = e => { sMonth = e.target.value; openSales(); };
   $('sDate').onchange = e => { sDate = e.target.value || todayKey(); openSales(); };
   $('sQ').oninput = e => { sQ = e.target.value; const pos = e.target.selectionStart; renderSales(); const i = $('sQ'); i.focus(); i.setSelectionRange(pos, pos); };
+  if ($('sBrandChips')){
+    $('sBrandChips').scrollLeft = chipsScroll;
+    $('sBrandChips').onclick = e => { const b = e.target.closest('[data-brand]'); if (!b) return; sBrand = b.dataset.brand; renderSales(); };
+  }
   sBar();
 }
 function setSQty(code, q){
