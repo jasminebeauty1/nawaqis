@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>ملخص المبيعات — جاسمين بيوتي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap">
+<style>
+/* Executive sales summary: headline numbers first, then branches against their monthly target, the daily trend, and the top items. */
+:root{
+  --bg:#F4F4F8; --surface:#FFFFFF; --sunk:#EAEAF2; --line:#DCDCE7;
+  --ink:#1E1D45; --muted:#5F5E7C;
+  --accent:#292663; --accent-ink:#FFFFFF; --accent-soft:#E7E6F3;
+  --coral:#E7634A; --coral-ink:#FFFFFF; --coral-soft:#FDEAE5;
+  --ok:#2E7D4F; --ok-soft:#E2F3E8; --warn:#8A5A00; --warn-soft:#FDF1D6; --danger:#C0392B;
+  --font-display:"Poppins","Noto Sans Arabic",Tahoma,sans-serif;
+  --font-body:"Noto Sans Arabic","Poppins",Tahoma,"Segoe UI",sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121229; --surface:#1B1A38; --sunk:#25244A; --line:#36355E;
+  --ink:#ECEBF8; --muted:#A4A3C4;
+  --accent:#8F8BE3; --accent-ink:#121229; --accent-soft:#2A2858;
+  --coral:#F07A63; --coral-ink:#1B0F0C; --coral-soft:#40252A;
+  --ok:#72CC93; --ok-soft:#1C3A2A; --warn:#F2C46B; --warn-soft:#3D3218; --danger:#F08A7A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121229; --surface:#1B1A38; --sunk:#25244A; --line:#36355E;
+  --ink:#ECEBF8; --muted:#A4A3C4;
+  --accent:#8F8BE3; --accent-ink:#121229; --accent-soft:#2A2858;
+  --coral:#F07A63; --coral-ink:#1B0F0C; --coral-soft:#40252A;
+  --ok:#72CC93; --ok-soft:#1C3A2A; --warn:#F2C46B; --warn-soft:#3D3218; --danger:#F08A7A; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55}
+[hidden]{display:none!important}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{background:var(--surface);border-bottom:3px solid var(--coral);position:sticky;top:0;z-index:5}
+header .wrap{padding-block:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{background:#fff;border-radius:8px;padding:4px 6px;display:block}
+.logo img{display:block;height:34px;width:auto}
+.sep{width:1px;align-self:stretch;background:var(--line)}
+.brand h1{font-size:18px}
+.brand small{display:block;color:var(--muted);font-size:12.5px;font-family:var(--font-body)}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tools input[type=month]{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:7px 10px}
+.btn{border:0;border-radius:10px;padding:9px 16px;font-weight:600;background:var(--coral);color:var(--coral-ink);cursor:pointer}
+.btn.ghost{background:var(--sunk);color:var(--ink)}
+main{padding-block:18px 40px;display:flex;flex-direction:column;gap:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .l{font-size:12.5px;color:var(--muted)}
+.kpi .v{font-family:var(--font-display);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.kpi .s{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.hero{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.kpi.hero .l,.kpi.hero .s{color:var(--accent-ink);opacity:.8}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card h2{font-size:16.5px;margin-bottom:12px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.card h2 small{font-family:var(--font-body);font-size:12.5px;color:var(--muted);font-weight:400}
+.grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+.brs{display:flex;flex-direction:column;gap:12px}
+.br{display:grid;grid-template-columns:minmax(90px,140px) 1fr auto;gap:10px;align-items:center}
+.br .n{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:12px;border-radius:999px;background:var(--sunk);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 0 0 auto;border-radius:999px;background:var(--accent)}
+.bar i.hit{background:var(--ok)}
+.bar i.low{background:var(--coral)}
+.br .q{font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap;text-align:left;min-width:92px}
+.br .q b{font-size:14.5px}
+.br .q span{color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:5px;vertical-align:-1px}
+.chart{width:100%;height:auto;display:block}
+.top{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.top li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.top li:last-child{border-bottom:0}
+.top .rk{font-family:var(--font-display);color:var(--muted);font-weight:600;text-align:center}
+.top .nm{min-width:0}
+.top .nm small{display:block;color:var(--muted);font-size:11.5px}
+.top .qt{font-weight:700;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);text-align:center;padding:24px 8px}
+.lock{max-width:380px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:12px;text-align:center}
+.lock input{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:22px;text-align:center;letter-spacing:.3em;direction:ltr;width:100%}
+.err{color:var(--danger);font-size:13px;min-height:1.2em}
+.note{font-size:12.5px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <span class="logo"><img src="https://www.jasminbeauty.sa/web/image/res.company/1/logo" alt="Jasmine Beauty"></span>
+      <span class="sep" aria-hidden="true"></span>
+      <div><h1>ملخص المبيعات</h1><small id="sub">للإدارة التنفيذية</small></div>
+    </div>
+    <div class="tools" id="tools" hidden>
+      <input type="month" id="month" aria-label="الشهر">
+      <button class="btn ghost" id="refresh">تحديث</button>
+      <button class="btn" id="xl">تنزيل Excel</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <form class="lock" id="lock">
+    <h2>أدخل رمز الدخول</h2>
+    <input id="pin" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="الرمز">
+    <div class="err" id="err"></div>
+    <button class="btn" type="submit" id="go">دخول</button>
+    <div class="note">صفحة عرض فقط، لا يمكن التعديل منها.</div>
+  </form>
+
+  <div id="report" hidden>
+    <section class="kpis" id="kpis"></section>
+    <div class="grid2" style="margin-top:18px">
+      <section class="card">
+        <h2>الفروع مقابل التارقت <small id="tgtNote"></small></h2>
+        <div class="brs" id="brs"></div>
+        <div class="legend"><span><i style="background:var(--ok)"></i>حقق التارقت</span><span><i style="background:var(--accent)"></i>في الطريق</span><span><i style="background:var(--coral)"></i>متأخر عن وتيرة الشهر</span></div>
+      </section>
+      <section class="card">
+        <h2>المبيعات اليومية <small>كل الفروع</small></h2>
+        <div id="trend"></div>
+      </section>
+    </div>
+    <section class="card" style="margin-top:18px">
+      <h2>أكثر الأصناف مبيعاً <small id="topNote"></small></h2>
+      <ol class="top" id="top"></ol>
+    </section>
+    <p class="note" id="stamp" style="margin-top:14px"></p>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbzhypLGX6X1_Ui_OEy_yinxFZxohqI8p9oULMkA0Q20n8GRuYfZZVquoxZdjX8bYRqY/exec';
+const $ = id => document.getElementById(id);
+const ls = {
+  get(k){ try { return localStorage.getItem('ceo:' + k); } catch { return null; } },
+  set(k, v){ try { localStorage.setItem('ceo:' + k, v); } catch {} }
+};
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const fmt = n => Number(n || 0).toLocaleString('en-US');
+const monthName = m => new Date(m + '-01T12:00:00').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric' });
+const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'short' });
+
+let pin = ls.get('pin') || '', month = new Date().toLocaleDateString('en-CA').slice(0, 7), rep = null, timer = null;
+$('month').value = month;
+
+async function call(fn, body){
+  const r = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ fn, body }), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, credentials: 'omit', redirect: 'follow' });
+  if (!r.ok) throw new Error('http ' + r.status);
+  return r.json();
+}
+
+async function load(){
+  $('refresh').disabled = true;
+  try {
+    const r = await call('ceoSummary', { pin, month });
+    if (r.error){
+      if (r.status === 401 || r.status === 429){ pin = ''; ls.set('pin', ''); showLock(r.status === 429 ? 'محاولات كثيرة، حاول بعد ربع ساعة.' : 'الرمز غير صحيح.'); }
+      return false;
+    }
+    rep = r; render(); return true;
+  } catch { $('stamp').textContent = 'تعذر التحديث، تأكد من الإنترنت.'; return false; }
+  finally { $('refresh').disabled = false; }
+}
+
+function showLock(msg){
+  clearInterval(timer);
+  $('report').hidden = true; $('tools').hidden = true; $('lock').hidden = false;
+  $('err').textContent = msg || ''; $('pin').value = ''; $('pin').focus();
+}
+
+$('lock').addEventListener('submit', async e => {
+  e.preventDefault();
+  pin = $('pin').value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim();
+  if (!pin) return;
+  $('go').disabled = true; $('err').textContent = '';
+  if (await load()){ ls.set('pin', pin); start(); }
+  $('go').disabled = false;
+});
+
+function start(){
+  $('lock').hidden = true; $('report').hidden = false; $('tools').hidden = false;
+  clearInterval(timer);
+  timer = setInterval(() => { if (!document.hidden) load(); }, 5 * 60 * 1000);
+}
+
+$('month').addEventListener('change', e => { month = e.target.value || month; load(); });
+$('refresh').addEventListener('click', load);
+
+function render(){
+  const B = Object.entries(rep.branches || {});
+  const target = rep.target || 0;
+  const total = B.reduce((s, [, b]) => s + (b.pieces || 0), 0);
+  const days = {};
+  B.forEach(([, b]) => Object.entries(b.days || {}).forEach(([d, q]) => { days[d] = (days[d] || 0) + q; }));
+  const dayKeys = Object.keys(days).sort();
+  const active = B.filter(([, b]) => b.pieces > 0).length;
+  const best = B.slice().sort((a, b) => b[1].pieces - a[1].pieces)[0];
+
+  // Share of the month gone: for the current month, today; for a past month, all of it.
+  const [y, m] = rep.month.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const isNow = rep.today && rep.today.slice(0, 7) === rep.month;
+  const elapsed = isNow ? Number(rep.today.slice(8, 10)) : daysInMonth;
+  const pace = elapsed / daysInMonth;
+
+  $('sub').textContent = monthName(rep.month);
+  $('kpis').innerHTML = `
+    <div class="kpi hero"><span class="l">إجمالي المبيعات</span><span class="v">${fmt(total)}</span><span class="s">قطعة · ${monthName(rep.month)}</span></div>
+    <div class="kpi"><span class="l">متوسط اليوم</span><span class="v">${fmt(dayKeys.length ? Math.round(total / dayKeys.length) : 0)}</span><span class="s">قطعة في ${dayKeys.length} يوم مسجل</span></div>
+    <div class="kpi"><span class="l">الفروع اللي سجلت</span><span class="v">${active}<span style="font-size:16px;color:var(--muted)"> / ${B.length}</span></span><span class="s">${B.length - active ? (B.length - active) + ' فرع بدون مبيعات' : 'كل الفروع سجلت'}</span></div>
+    <div class="kpi"><span class="l">أعلى فرع</span><span class="v" style="font-size:22px">${best && best[1].pieces ? esc(best[0]) : '—'}</span><span class="s">${best && best[1].pieces ? fmt(best[1].pieces) + ' قطعة' : 'لا توجد مبيعات'}</span></div>`;
+
+  $('tgtNote').textContent = target ? `التارقت ${fmt(target)} قطعة لكل فرع في الشهر` : '';
+  const max = Math.max(target, ...B.map(([, b]) => b.pieces), 1);
+  $('brs').innerHTML = B.slice().sort((a, b) => b[1].pieces - a[1].pieces).map(([name, b]) => {
+    const pct = target ? b.pieces / target : 0;
+    const cls = target && b.pieces >= target ? 'hit' : (target && pct < pace * 0.8 ? 'low' : '');
+    const last = Object.keys(b.days || {}).sort().pop();
+    return `<div class="br" title="${last ? 'آخر تسجيل: ' + dayName(last) : 'لم يسجل'}">
+      <span class="n">${esc(name)}</span>
+      <span class="bar"><i class="${cls}" style="width:${Math.min(100, b.pieces / max * 100)}%"></i></span>
+      <span class="q"><b>${fmt(b.pieces)}</b>${target ? ` <span>· ${Math.round(pct * 100)}%</span>` : ''}</span>
+    </div>`;
+  }).join('') || '<div class="empty">لا توجد فروع</div>';
+
+  $('trend').innerHTML = dayKeys.length ? trendSvg(dayKeys, days) : '<div class="empty">لا توجد مبيعات مسجلة في هذا الشهر</div>';
+
+  const items = {};
+  B.forEach(([, b]) => Object.entries(b.items || {}).forEach(([code, it]) => {
+    const t = items[code] || (items[code] = { n: it.n, br: it.br, q: 0 });
+    t.q += it.q || 0;
+  }));
+  const top = Object.values(items).sort((a, b) => b.q - a.q).slice(0, 10);
+  $('topNote').textContent = top.length ? `من ${fmt(Object.keys(items).length)} صنف انباع` : '';
+  $('top').innerHTML = top.map((t, i) => `<li><span class="rk">${i + 1}</span><span class="nm">${esc(t.n)}<small>${esc(t.br)}</small></span><span class="qt">${fmt(t.q)}</span></li>`).join('') || '<li class="empty">لا توجد مبيعات</li>';
+
+  $('stamp').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-SA-u-nu-latn', { hour: 'numeric', minute: '2-digit' }) + ' · يتحدث تلقائياً كل 5 دقائق';
+}
+
+// Daily totals as bars; one scale for bars, gridlines and labels.
+function trendSvg(keys, days){
+  const W = 520, H = 220, L = 40, R = 8, T = 12, Bm = 30;
+  const vals = keys.map(k => days[k]);
+  const maxV = Math.max(...vals, 1);
+  const step = Math.pow(10, Math.floor(Math.log10(maxV)));
+  const nice = [1, 2, 5, 10].map(f => f * step).find(s => maxV / s <= 5) || step * 10;
+  const top = Math.ceil(maxV / nice) * nice;
+  const y = v => T + (H - T - Bm) * (1 - v / top);
+  const bw = (W - L - R) / keys.length;
+  const ticks = []; for (let v = 0; v <= top; v += nice) ticks.push(v);
+  const every = Math.ceil(keys.length / 8);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="المبيعات اليومية">
+    ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" font-size="11" text-anchor="end" fill="var(--muted)">${fmt(v)}</text>`).join('')}
+    ${keys.map((k, i) => {
+      const x = L + i * bw + bw * 0.18, w = bw * 0.64, h = y(0) - y(days[k]);
+      return `<rect x="${x}" y="${y(days[k])}" width="${w}" height="${Math.max(h, 0)}" rx="3" fill="var(--accent)"><title>${dayName(k)}: ${fmt(days[k])} قطعة</title></rect>` +
+        (i % every === 0 || i === keys.length - 1 ? `<text x="${x + w / 2}" y="${H - 10}" font-size="11" text-anchor="middle" fill="var(--muted)">${dayName(k)}</text>` : '');
+    }).join('')}
+  </svg>`;
+}
+
+$('xl').addEventListener('click', () => {
+  if (!rep || !window.XLSX) return;
+  const B = Object.entries(rep.branches || {});
+  const wb = XLSX.utils.book_new();
+  const s1 = XLSX.utils.aoa_to_sheet([['الفرع', 'المبيعات (قطعة)', 'التارقت', 'نسبة التحقيق'],
+    ...B.map(([n, b]) => [n, b.pieces, rep.target || '', rep.target ? Math.round(b.pieces / rep.target * 100) + '%' : ''])]);
+  s1['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 10 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, s1, 'الفروع');
+  const items = {};
+  B.forEach(([bn, b]) => Object.entries(b.items || {}).forEach(([code, it]) => {
+    const t = items[code] || (items[code] = { n: it.n, br: it.br, by: {}, q: 0 });
+    t.by[bn] = (t.by[bn] || 0) + (it.q || 0); t.q += it.q || 0;
+  }));
+  const rows = Object.entries(items).sort((a, b) => b[1].q - a[1].q);
+  const s2 = XLSX.utils.aoa_to_sheet([['الباركود', 'اسم الصنف', 'البراند', ...B.map(([n]) => n), 'الإجمالي'],
+    ...rows.map(([code, t]) => [code, t.n, t.br, ...B.map(([n]) => t.by[n] || ''), t.q])]);
+  for (let r = 1; r <= rows.length; r++) s2[XLSX.utils.encode_cell({ r, c: 0 })] = { t: 's', v: rows[r - 1][0] };
+  XLSX.utils.book_append_sheet(wb, s2, 'الأصناف');
+  wb.Workbook = { Views: [{ RTL: true }] };
+  XLSX.writeFile(wb, `ملخص المبيعات ${rep.month}.xlsx`);
+});
+
+if (pin){ $('lock').hidden = true; load().then(ok => { if (ok) start(); else if ($('report').hidden && $('lock').hidden) showLock('تعذر الاتصال، حاول مرة ثانية.'); }); }
+else showLock();
+</script>
+</body>
+</html>
