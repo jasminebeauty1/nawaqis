@@ -75,6 +75,11 @@ main{padding-block:18px 40px;display:flex;flex-direction:column;gap:18px}
 .br .q{font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap;text-align:left;min-width:92px}
 .br .q b{font-size:14.5px}
 .br .q span{color:var(--muted)}
+.grp{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;padding-top:6px;border-top:1px solid var(--line);margin-top:4px}
+.grp:first-child{border-top:0;margin-top:0;padding-top:0}
+.grp .gn{font-weight:700;font-size:13.5px}
+.grp .gn i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;vertical-align:-1px}
+.grp .gs{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:5px;vertical-align:-1px}
 .chart{width:100%;height:auto;display:block}
@@ -197,62 +202,80 @@ function start(){
 $('month').addEventListener('change', e => { month = e.target.value || month; load(); });
 $('refresh').addEventListener('click', load);
 
+// Both companies side by side: Jasmine Beauty's branches/customers and مخازن العناية.
+function groups(){
+  const g = [{ key: 'jb', name: 'جاسمين بيوتي — الفروع والعملاء', color: 'var(--accent)', target: rep.target || 0, branches: rep.branches || {} }];
+  const mk = rep.makhazen;
+  if (mk && !mk.error) g.push({ key: 'mk', name: 'مخازن العناية', color: 'var(--coral)', target: mk.target || 0, branches: mk.branches || {} });
+  return g;
+}
+
 function render(){
-  const B = Object.entries(rep.branches || {});
-  const target = rep.target || 0;
-  const total = B.reduce((s, [, b]) => s + (b.pieces || 0), 0);
+  const G = groups();
+  const all = G.flatMap(g => Object.entries(g.branches).map(([n, b]) => ({ g, n, b })));
+  const total = all.reduce((s, x) => s + (x.b.pieces || 0), 0);
   const days = {};
-  B.forEach(([, b]) => Object.entries(b.days || {}).forEach(([d, q]) => { days[d] = (days[d] || 0) + q; }));
+  G.forEach(g => Object.values(g.branches).forEach(b => Object.entries(b.days || {}).forEach(([d, q]) => {
+    const t = days[d] || (days[d] = {}); t[g.key] = (t[g.key] || 0) + q;
+  })));
   const dayKeys = Object.keys(days).sort();
-  const active = B.filter(([, b]) => b.pieces > 0).length;
-  const best = B.slice().sort((a, b) => b[1].pieces - a[1].pieces)[0];
+  const active = all.filter(x => x.b.pieces > 0).length;
+  const best = all.slice().sort((a, b) => b.b.pieces - a.b.pieces)[0];
 
   // Share of the month gone: for the current month, today; for a past month, all of it.
   const [y, m] = rep.month.split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const isNow = rep.today && rep.today.slice(0, 7) === rep.month;
-  const elapsed = isNow ? Number(rep.today.slice(8, 10)) : daysInMonth;
-  const pace = elapsed / daysInMonth;
+  const pace = (isNow ? Number(rep.today.slice(8, 10)) : daysInMonth) / daysInMonth;
 
+  const split = G.map(g => `${g.key === 'mk' ? 'مخازن' : 'جاسمين'} ${fmt(Object.values(g.branches).reduce((s, b) => s + b.pieces, 0))}`).join(' · ');
   $('sub').textContent = monthName(rep.month);
   $('kpis').innerHTML = `
-    <div class="kpi hero"><span class="l">إجمالي المبيعات</span><span class="v">${fmt(total)}</span><span class="s">قطعة · ${monthName(rep.month)}</span></div>
+    <div class="kpi hero"><span class="l">إجمالي المبيعات</span><span class="v">${fmt(total)}</span><span class="s">قطعة · ${esc(split)}</span></div>
     <div class="kpi"><span class="l">متوسط اليوم</span><span class="v">${fmt(dayKeys.length ? Math.round(total / dayKeys.length) : 0)}</span><span class="s">قطعة في ${dayKeys.length} يوم مسجل</span></div>
-    <div class="kpi"><span class="l">الفروع اللي سجلت</span><span class="v">${active}<span style="font-size:16px;color:var(--muted)"> / ${B.length}</span></span><span class="s">${B.length - active ? (B.length - active) + ' فرع بدون مبيعات' : 'كل الفروع سجلت'}</span></div>
-    <div class="kpi"><span class="l">أعلى فرع</span><span class="v" style="font-size:22px">${best && best[1].pieces ? esc(best[0]) : '—'}</span><span class="s">${best && best[1].pieces ? fmt(best[1].pieces) + ' قطعة' : 'لا توجد مبيعات'}</span></div>`;
+    <div class="kpi"><span class="l">الفروع اللي سجلت</span><span class="v">${active}<span style="font-size:16px;color:var(--muted)"> / ${all.length}</span></span><span class="s">${all.length - active ? (all.length - active) + ' فرع بدون مبيعات' : 'كل الفروع سجلت'}</span></div>
+    <div class="kpi"><span class="l">أعلى فرع</span><span class="v" style="font-size:20px">${best && best.b.pieces ? esc(best.n) : '—'}</span><span class="s">${best && best.b.pieces ? fmt(best.b.pieces) + ' قطعة · ' + esc(best.g.key === 'mk' ? 'مخازن العناية' : 'جاسمين') : 'لا توجد مبيعات'}</span></div>`;
 
-  $('tgtNote').textContent = target ? `التارقت ${fmt(target)} قطعة لكل فرع في الشهر` : '';
-  const max = Math.max(target, ...B.map(([, b]) => b.pieces), 1);
-  $('brs').innerHTML = B.slice().sort((a, b) => b[1].pieces - a[1].pieces).map(([name, b]) => {
-    const pct = target ? b.pieces / target : 0;
-    const cls = target && b.pieces >= target ? 'hit' : (target && pct < pace * 0.8 ? 'low' : '');
-    const last = Object.keys(b.days || {}).sort().pop();
-    return `<div class="br" title="${last ? 'آخر تسجيل: ' + dayName(last) : 'لم يسجل'}">
-      <span class="n">${esc(name)}</span>
-      <span class="bar"><i class="${cls}" style="width:${Math.min(100, b.pieces / max * 100)}%"></i></span>
-      <span class="q"><b>${fmt(b.pieces)}</b>${target ? ` <span>· ${Math.round(pct * 100)}%</span>` : ''}</span>
-    </div>`;
-  }).join('') || '<div class="empty">لا توجد فروع</div>';
+  const targets = [...new Set(G.map(g => g.target).filter(Boolean))];
+  $('tgtNote').textContent = targets.length === 1 ? `التارقت ${fmt(targets[0])} قطعة لكل فرع في الشهر` : '';
+  const max = Math.max(...G.map(g => g.target), ...all.map(x => x.b.pieces), 1);
+  $('brs').innerHTML = G.map(g => {
+    const list = Object.entries(g.branches).sort((a, b) => b[1].pieces - a[1].pieces);
+    const sum = list.reduce((s, [, b]) => s + b.pieces, 0);
+    const value = list.reduce((s, [, b]) => s + (b.value || 0), 0);
+    return `<div class="grp"><span class="gn"><i style="background:${g.color}"></i>${esc(g.name)}</span><span class="gs">${fmt(sum)} قطعة${value ? ' · ' + fmt(Math.round(value)) + ' ريال' : ''}</span></div>` +
+      list.map(([name, b]) => {
+        const pct = g.target ? b.pieces / g.target : 0;
+        const cls = g.target && b.pieces >= g.target ? 'hit' : (g.target && pct < pace * 0.8 ? 'low' : '');
+        const last = Object.keys(b.days || {}).sort().pop();
+        return `<div class="br" title="${last ? 'آخر تسجيل: ' + dayName(last) : 'لم يسجل'}">
+          <span class="n">${esc(name)}</span>
+          <span class="bar"><i class="${cls}" style="width:${Math.min(100, b.pieces / max * 100)}%"></i></span>
+          <span class="q"><b>${fmt(b.pieces)}</b>${g.target ? ` <span>· ${Math.round(pct * 100)}%</span>` : ''}</span>
+        </div>`;
+      }).join('');
+  }).join('') + (rep.makhazen && rep.makhazen.error ? '<div class="note">تعذر جلب مبيعات مخازن العناية الآن.</div>' : '') || '<div class="empty">لا توجد فروع</div>';
 
-  $('trend').innerHTML = dayKeys.length ? trendSvg(dayKeys, days) : '<div class="empty">لا توجد مبيعات مسجلة في هذا الشهر</div>';
+  $('trend').innerHTML = dayKeys.length ? trendSvg(dayKeys, days, G) : '<div class="empty">لا توجد مبيعات مسجلة في هذا الشهر</div>';
 
   const items = {};
-  B.forEach(([, b]) => Object.entries(b.items || {}).forEach(([code, it]) => {
+  G.forEach(g => Object.values(g.branches).forEach(b => Object.entries(b.items || {}).forEach(([code, it]) => {
     const t = items[code] || (items[code] = { n: it.n, br: it.br, q: 0 });
+    if (!t.br && it.br) t.br = it.br;
     t.q += it.q || 0;
-  }));
+  })));
   const top = Object.values(items).sort((a, b) => b.q - a.q).slice(0, 10);
   $('topNote').textContent = top.length ? `من ${fmt(Object.keys(items).length)} صنف انباع` : '';
-  $('top').innerHTML = top.map((t, i) => `<li><span class="rk">${i + 1}</span><span class="nm">${esc(t.n)}<small>${esc(t.br)}</small></span><span class="qt">${fmt(t.q)}</span></li>`).join('') || '<li class="empty">لا توجد مبيعات</li>';
+  $('top').innerHTML = top.map((t, i) => `<li><span class="rk">${i + 1}</span><span class="nm">${esc(t.n)}${t.br ? `<small>${esc(t.br)}</small>` : ''}</span><span class="qt">${fmt(t.q)}</span></li>`).join('') || '<li class="empty">لا توجد مبيعات</li>';
 
   $('stamp').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-SA-u-nu-latn', { hour: 'numeric', minute: '2-digit' }) + ' · يتحدث تلقائياً كل 5 دقائق';
 }
 
-// Daily totals as bars; one scale for bars, gridlines and labels.
-function trendSvg(keys, days){
-  const W = 520, H = 220, L = 40, R = 8, T = 12, Bm = 30;
-  const vals = keys.map(k => days[k]);
-  const maxV = Math.max(...vals, 1);
+// Daily totals as stacked bars (one colour per company); one scale for bars, gridlines and labels.
+function trendSvg(keys, days, G){
+  const W = 520, H = 230, L = 40, R = 8, T = 12, Bm = 30;
+  const tot = k => G.reduce((s, g) => s + (days[k][g.key] || 0), 0);
+  const maxV = Math.max(...keys.map(tot), 1);
   const step = Math.pow(10, Math.floor(Math.log10(maxV)));
   const nice = [1, 2, 5, 10].map(f => f * step).find(s => maxV / s <= 5) || step * 10;
   const top = Math.ceil(maxV / nice) * nice;
@@ -260,32 +283,40 @@ function trendSvg(keys, days){
   const bw = (W - L - R) / keys.length;
   const ticks = []; for (let v = 0; v <= top; v += nice) ticks.push(v);
   const every = Math.ceil(keys.length / 8);
+  const bars = keys.map((k, i) => {
+    const x = L + i * bw + bw * 0.18, w = bw * 0.64;
+    let base = 0;
+    const segs = G.map(g => {
+      const q = days[k][g.key] || 0; if (!q) return '';
+      const r = `<rect x="${x}" y="${y(base + q)}" width="${w}" height="${Math.max(y(base) - y(base + q), 0)}" fill="${g.color}"><title>${dayName(k)} · ${g.key === 'mk' ? 'مخازن العناية' : 'جاسمين'}: ${fmt(q)} قطعة</title></rect>`;
+      base += q; return r;
+    }).join('');
+    return segs + (i % every === 0 || i === keys.length - 1 ? `<text x="${x + w / 2}" y="${H - 10}" font-size="11" text-anchor="middle" fill="var(--muted)">${dayName(k)}</text>` : '');
+  }).join('');
+  const legend = G.length > 1 ? `<div class="legend">${G.map(g => `<span><i style="background:${g.color}"></i>${esc(g.key === 'mk' ? 'مخازن العناية' : 'جاسمين بيوتي')}</span>`).join('')}</div>` : '';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="المبيعات اليومية">
     ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" font-size="11" text-anchor="end" fill="var(--muted)">${fmt(v)}</text>`).join('')}
-    ${keys.map((k, i) => {
-      const x = L + i * bw + bw * 0.18, w = bw * 0.64, h = y(0) - y(days[k]);
-      return `<rect x="${x}" y="${y(days[k])}" width="${w}" height="${Math.max(h, 0)}" rx="3" fill="var(--accent)"><title>${dayName(k)}: ${fmt(days[k])} قطعة</title></rect>` +
-        (i % every === 0 || i === keys.length - 1 ? `<text x="${x + w / 2}" y="${H - 10}" font-size="11" text-anchor="middle" fill="var(--muted)">${dayName(k)}</text>` : '');
-    }).join('')}
-  </svg>`;
+    ${bars}
+  </svg>${legend}`;
 }
 
 $('xl').addEventListener('click', () => {
   if (!rep || !window.XLSX) return;
-  const B = Object.entries(rep.branches || {});
+  const G = groups();
+  const all = G.flatMap(g => Object.entries(g.branches).map(([n, b]) => ({ g, n, b })));
   const wb = XLSX.utils.book_new();
-  const s1 = XLSX.utils.aoa_to_sheet([['الفرع', 'المبيعات (قطعة)', 'التارقت', 'نسبة التحقيق'],
-    ...B.map(([n, b]) => [n, b.pieces, rep.target || '', rep.target ? Math.round(b.pieces / rep.target * 100) + '%' : ''])]);
-  s1['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 10 }, { wch: 12 }];
+  const s1 = XLSX.utils.aoa_to_sheet([['الجهة', 'الفرع', 'المبيعات (قطعة)', 'التارقت', 'نسبة التحقيق'],
+    ...all.map(x => [x.g.key === 'mk' ? 'مخازن العناية' : 'جاسمين بيوتي', x.n, x.b.pieces, x.g.target || '', x.g.target ? Math.round(x.b.pieces / x.g.target * 100) + '%' : ''])]);
+  s1['!cols'] = [{ wch: 14 }, { wch: 22 }, { wch: 16 }, { wch: 10 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, s1, 'الفروع');
   const items = {};
-  B.forEach(([bn, b]) => Object.entries(b.items || {}).forEach(([code, it]) => {
-    const t = items[code] || (items[code] = { n: it.n, br: it.br, by: {}, q: 0 });
-    t.by[bn] = (t.by[bn] || 0) + (it.q || 0); t.q += it.q || 0;
+  all.forEach(x => Object.entries(x.b.items || {}).forEach(([code, it]) => {
+    const t = items[code] || (items[code] = { n: it.n, br: it.br || '', by: {}, q: 0 });
+    t.by[x.n] = (t.by[x.n] || 0) + (it.q || 0); t.q += it.q || 0;
   }));
   const rows = Object.entries(items).sort((a, b) => b[1].q - a[1].q);
-  const s2 = XLSX.utils.aoa_to_sheet([['الباركود', 'اسم الصنف', 'البراند', ...B.map(([n]) => n), 'الإجمالي'],
-    ...rows.map(([code, t]) => [code, t.n, t.br, ...B.map(([n]) => t.by[n] || ''), t.q])]);
+  const s2 = XLSX.utils.aoa_to_sheet([['الباركود', 'اسم الصنف', 'البراند', ...all.map(x => x.n), 'الإجمالي'],
+    ...rows.map(([code, t]) => [code, t.n, t.br, ...all.map(x => t.by[x.n] || ''), t.q])]);
   for (let r = 1; r <= rows.length; r++) s2[XLSX.utils.encode_cell({ r, c: 0 })] = { t: 's', v: rows[r - 1][0] };
   XLSX.utils.book_append_sheet(wb, s2, 'الأصناف');
   wb.Workbook = { Views: [{ RTL: true }] };
