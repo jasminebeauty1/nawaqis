@@ -964,7 +964,7 @@ function setPreview(){
 function openProduct(p){
   stEdit = p || null; stImg = p ? p.img : '';
   $('pTitle').textContent = p ? 'تعديل صنف' : 'إضافة صنف';
-  $('pSub').textContent = (stLists.find(x => x.tab === stList) || {}).label || '';
+  $('pSub').textContent = stList === 'الأصناف' ? 'الأصناف الرئيسية (مصدر الصور لكل القوائم)' : stList;
   $('pB').value = p ? p.b : ''; $('pN').value = p ? p.n : ''; $('pBr').value = p ? p.br : '';
   $('pBrands').innerHTML = [...new Set(stProducts.map(x => x.br).filter(Boolean))].map(b => `<option value="${esc(b)}">`).join('');
   $('pDel').hidden = !p; $('pErr').textContent = ''; $('pFile').value = '';
