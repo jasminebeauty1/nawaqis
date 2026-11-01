@@ -412,15 +412,19 @@ function renderBranches(){
   const n = Object.keys(carts[branch] || {}).length;
   $('branches').innerHTML = `<span class="bchip" aria-pressed="true">${esc(branch)}${n ? `<span class="n">${n}</span>` : ''}</span><button class="btn sm ghost" id="switchBranch">تغيير الفرع</button>`;
 }
+// Branches that only record daily sales: the shortages tab is hidden for them.
+const SALES_ONLY = new Set(['السوق كيو - مخرج 17', 'السوق كيو - التحلية']);
 function openBranch(b){
   branch = b; ls.set('branch', b);
   if (!carts[b]){ try { carts[b] = JSON.parse(ls.get('cart:' + b) || '{}'); } catch { carts[b] = {}; } }
   renderBranches(); renderBasket(); loadProducts(b);
-  if (curTab === 'sales') showTab('sales');
+  $('tab-order').hidden = SALES_ONLY.has(b);
+  if (curTab === 'sales' || (SALES_ONLY.has(b) && curTab === 'order')) showTab('sales');
 }
 function logout(){
   if (branch) ls.set('pin:' + branch, '');
   branch = ''; ls.set('branch', ''); P = []; PB = {};
+  $('tab-order').hidden = false;
   renderBranches(); renderGrid(); renderBasket();
   if (curTab === 'sales') showTab('sales');
 }
@@ -759,7 +763,7 @@ function renderSales(){
   v.innerHTML = `
   <div class="scard">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="font-size:16px">مبيعات فرع ${esc(branch)} — ${sRep ? monthName(sRep.month) : ''}</h3>
-      <select id="sMonth" class="brandsel">${monthOptions(sMonth)}</select></div>
+      <select id="sMonth" class="brandsel">${monthOptions(sMonth)}</select>${SALES_ONLY.has(branch) ? '<button class="btn sm ghost" id="switchBranch">تغيير الفرع</button>' : ''}</div>
     ${me ? progressHTML(me.pieces, sRep.target) : '<div class="hint">جاري التحميل…</div>'}
   </div>
   <div class="scard">
