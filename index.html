@@ -674,7 +674,10 @@ async function loadOrders(){
 }
 // ---------- Daily sales: pieces sold per item, monthly target, no commission ----------
 // Unavailable-in-warehouse items stay open here, since the branch may still have them on the shelf.
-let sDate = todayKey(), sQty = {}, sMonth = todayKey().slice(0, 7), sRep = null, sQ = '', sLoading = false;
+// After midnight (before 5 am Riyadh) the shift is still yesterday's, so the sales date opens on yesterday.
+const riyadhHour = () => +new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Riyadh', hour: '2-digit', hour12: false }).format(new Date()) % 24;
+const salesStartDate = () => { if (riyadhHour() >= 5) return todayKey(); const d = new Date(todayKey() + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+let sDate = salesStartDate(), sQty = {}, sMonth = todayKey().slice(0, 7), sRep = null, sQ = '', sLoading = false;
 const sTotals = () => { const ks = Object.keys(sQty); return { n: ks.length, qty: ks.reduce((s, k) => s + sQty[k], 0) }; };
 const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const monthName = m => MONTHS_AR[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4);
@@ -700,6 +703,10 @@ async function openSales(){
     ]);
     if (d.error || r.error) throw Object.assign(new Error(d.error || r.error), { status: d.status || r.status });
     sQty = d.qty || {}; sRep = r;
+    // a change that never reached the sheet (no internet, app closed) is still on the phone: send it now
+    const dr = sReadDraft();
+    if (dr && dr.branch === branch && dr.date === sDate && JSON.stringify(dr.qty) !== JSON.stringify(sQty)){ sQty = dr.qty; sQueueSave(0); }
+    else { sClearDraft(); sSaveState('saved'); }
   } catch (e) {
     if (e.status === 401){ toast('رمز الفرع تغيّر. اكتبي الرمز الجديد.'); logout(); askPin('branch'); return; }
     toast('تعذر تحميل المبيعات. تأكدي من الإنترنت.');
@@ -729,7 +736,7 @@ function renderSales(){
       <label class="search" style="align-self:end"><input id="sQ" type="search" placeholder="ابحثي باسم الصنف أو الباركود" value="${esc(sQ)}" autocomplete="off"></label>
     </div>
     ${P.length ? `<div class="bchips" id="sBrandChips" role="group" aria-label="البراند" style="margin-top:10px">${brandChipsHTML(sBrand)}</div>` : ''}
-    <div class="hint" style="margin-top:8px">${sLoading ? 'جاري التحميل…' : 'اكتبي كم حبة انباعت من كل صنف في هذا اليوم ثم اضغطي «حفظ». تقدرين ترجعين وتعدّلين.'}</div>
+    <div class="hint" style="margin-top:8px">${sLoading ? 'جاري التحميل…' : (riyadhHour() < 5 && sDate !== todayKey() ? `بعد نص الليل: التاريخ على مبيعات أمس (${sDate})، غيّريه إذا تبين اليوم. ` : '') + 'كل حبة تكتبينها تنحفظ تلقائيًا ✓ وتقدرين تعدّلين أي يوم.'}</div>
   </div>
   <div class="slist" id="slist">${P.length ? list.map(p => { const q = sQty[p.b] || 0;
     return `<div class="srow${q ? ' has' : ''}" data-b="${p.b}">${p.img ? `<img src="${p.img}" alt="" loading="lazy">` : '<div class="ni"></div>'}
@@ -739,7 +746,7 @@ function renderSales(){
   ${me && me.pieces ? `<div class="scard"><h3 style="font-size:15px;margin-bottom:6px">أيام الشهر</h3>${Object.keys(me.days).sort().reverse().map(d => `<div class="sday"><span>${d}</span><b>${me.days[d]} حبة</b></div>`).join('')}</div>` : ''}
   ${adminSalesHTML()}`;
   $('sMonth').onchange = e => { sMonth = e.target.value; openSales(); };
-  $('sDate').onchange = e => { sDate = e.target.value || todayKey(); openSales(); };
+  $('sDate').onchange = async e => { const v = e.target.value || todayKey(); await sFlushSave(); sDate = v; openSales(); };
   $('sQ').oninput = e => { sQ = e.target.value; const pos = e.target.selectionStart; renderSales(); const i = $('sQ'); i.focus(); i.setSelectionRange(pos, pos); };
   if ($('sBrandChips')){
     $('sBrandChips').scrollLeft = chipsScroll;
@@ -753,6 +760,7 @@ function setSQty(code, q){
   const row = $('slist').querySelector(`.srow[data-b="${code}"]`);
   if (row){ row.classList.toggle('has', !!q); const inp = row.querySelector('input'); if (document.activeElement !== inp) inp.value = q || ''; }
   sBar();
+  sQueueSave();
 }
 $('view-sales').addEventListener('click', e => {
   const b = e.target.closest('[data-s]'); if (!b) return;
@@ -775,18 +783,59 @@ function sBar(){
   $('sWa').href = 'https://wa.me/?text=' + encodeURIComponent(salesText());
   $('sWa').classList.toggle('off', !t.n);
 }
-$('sWa').addEventListener('click', e => { if (!sTotals().n){ e.preventDefault(); toast('ما فيه مبيعات تنرسل'); } });
-$('sSave').addEventListener('click', async () => {
-  const btn = $('sSave'); btn.disabled = true; btn.textContent = 'جاري الحفظ…';
-  try {
-    const r = await call('salesSaveDay', { branch, pin: branchPin(branch), date: sDate, qty: sQty, promoter: $('pname').value.trim() || ls.get('name') || '' });
-    if (r.error) throw Object.assign(new Error(r.error), { status: r.status });
-    toast(r.saved ? `تم حفظ المبيعات ✓ ${r.pieces} حبة` : 'تم الحفظ ✓ (بدون مبيعات لهذا اليوم)');
-    const rep = await call('salesReport', { branch, pin: branchPin(branch), month: sMonth });
-    if (!rep.error){ sRep = rep; renderSales(); }
-  } catch (e) {
-    toast(e.status === 401 ? 'رمز الفرع تغيّر. اكتبي الرمز الجديد.' : 'تعذر الحفظ الآن. تأكدي من الإنترنت وحاولي مرة أخرى.');
-  } finally { btn.disabled = false; btn.textContent = 'حفظ'; }
+$('sWa').addEventListener('click', e => { if (!sTotals().n){ e.preventDefault(); toast('ما فيه مبيعات تنرسل'); return; } sFlushSave(); });
+$('sSave').addEventListener('click', () => sFlushSave(true));
+
+// Auto-save: every change goes to the sheet shortly after the last tap; the day stays
+// on the phone as a draft until the sheet confirms it.
+let sSaveTimer = null, sSaving = null, sDirty = null, sRetryTimer = null;
+const sReadDraft = () => { try { return JSON.parse(ls.get('sdraft') || 'null'); } catch { return null; } };
+const sClearDraft = () => ls.set('sdraft', '');
+function sSaveState(s){
+  const b = $('sSave');
+  b.textContent = { saved: 'محفوظ ✓', pending: 'جاري الحفظ…', error: 'ما انحفظ — اضغطي' }[s];
+  b.classList.toggle('ghost', s === 'saved');
+}
+function sQueueSave(delay = 1200){
+  sDirty = { branch, date: sDate, qty: { ...sQty }, promoter: $('pname').value.trim() || ls.get('name') || '' };
+  ls.set('sdraft', JSON.stringify(sDirty));
+  sSaveState('pending');
+  clearTimeout(sSaveTimer); clearTimeout(sRetryTimer);
+  sSaveTimer = setTimeout(() => sFlushSave(), delay);
+}
+async function sFlushSave(manual){
+  clearTimeout(sSaveTimer);
+  if (sSaving) await sSaving;
+  if (!sDirty){ if (manual) toast('محفوظ ✓'); return; }
+  const job = sDirty; sDirty = null;
+  let ok = false;
+  sSaving = (async () => {
+    try {
+      const r = await call('salesSaveDay', { branch: job.branch, pin: branchPin(job.branch), date: job.date, qty: job.qty, promoter: job.promoter });
+      if (r.error) throw Object.assign(new Error(r.error), { status: r.status });
+      ok = true;
+      if (!sDirty){
+        sClearDraft(); sSaveState('saved'); if (manual) toast('محفوظ ✓');
+        call('salesReport', { branch, pin: branchPin(branch), month: sMonth }).then(rep => { if (!rep.error && curTab === 'sales'){ sRep = rep; if (!$('view-sales').contains(document.activeElement) && !sDirty) renderSales(); } }).catch(() => {});
+      }
+    } catch (e) {
+      if (e.status === 401){ sSaveState('error'); if (manual) toast('رمز الفرع تغيّر. اكتبي الرمز الجديد.'); return; }
+      if (!sDirty) sDirty = job;
+      sSaveState('error');
+      if (manual) toast(e.status === 401 ? 'رمز الفرع تغيّر. اكتبي الرمز الجديد.' : 'ما فيه إنترنت — بيتحفظ تلقائيًا أول ما يرجع');
+      clearTimeout(sRetryTimer); sRetryTimer = setTimeout(() => sFlushSave(), 10000);
+    }
+  })();
+  await sSaving; sSaving = null;
+  if (ok && sDirty) return sFlushSave(manual);  // more taps came in while saving
+}
+// leaving the app: send what is pending right away (keepalive survives the page closing)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden' || !sDirty) return;
+  clearTimeout(sSaveTimer);
+  const j = sDirty;
+  try { fetch(API_URL, { method: 'POST', keepalive: true, credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ fn: 'salesSaveDay', body: { branch: j.branch, pin: branchPin(j.branch), date: j.date, qty: j.qty, promoter: j.promoter } }) }); } catch {}
 });
 
 // Board PIN: every branch's month, with an Excel download.
