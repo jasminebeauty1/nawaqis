@@ -163,6 +163,12 @@ main{padding-block:16px 120px}
 .btn.off{opacity:.45}
 .tabs{flex-wrap:wrap}
 
+/* Settings */
+.strow{cursor:pointer}
+.nopic{display:grid;place-items:center;color:var(--muted);font-size:18px;background:var(--sunk)!important;border-radius:8px}
+.pimg{display:flex;gap:14px;align-items:center}
+.pimg #pPrev img{width:96px;height:96px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:10px}
+
 /* Purchasing board */
 .board{display:flex;flex-direction:column;gap:18px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -223,6 +229,7 @@ td.tot{font-weight:700;color:var(--accent)}
         <button role="tab" id="tab-order" aria-selected="true">طلب نواقص</button>
         <button role="tab" id="tab-sales" aria-selected="false">المبيعات اليومية</button>
         <button role="tab" id="tab-board" aria-selected="false">لوحة المشتريات</button>
+        <button role="tab" id="tab-settings" aria-selected="false" hidden>الإعدادات</button>
       </div>
     </div>
     <div id="orderTools" style="display:flex;flex-direction:column;gap:10px">
@@ -247,8 +254,30 @@ td.tot{font-weight:700;color:var(--accent)}
   </section>
   <section id="view-sales" hidden></section>
   <section id="view-board" class="board" hidden></section>
+  <section id="view-settings" hidden></section>
   <div class="notice" id="installBox" hidden style="margin-top:16px"><button class="btn ghost" id="installBtn" hidden>📲 تثبيت التطبيق على الجوال</button><span id="iosHint" hidden>لتثبيته كتطبيق: اضغطي زر المشاركة تحت ثم «إضافة إلى الشاشة الرئيسية»</span></div>
 </main>
+
+<div class="sheet" id="pSheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pTitle" style="max-width:480px">
+    <div class="hd"><div><h2 id="pTitle">إضافة صنف</h2><p id="pSub"></p></div><button class="x" id="pClose" aria-label="إغلاق">×</button></div>
+    <form class="bd" id="pForm">
+      <div class="pimg"><div id="pPrev"></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label class="btn ghost sm" style="cursor:pointer">📷 صورة من الجوال<input type="file" id="pFile" accept="image/*" hidden></label>
+          <button type="button" class="btn danger sm" id="pNoImg">حذف الصورة</button>
+        </div></div>
+      <div class="field"><label class="label" for="pB">الباركود</label><input id="pB" inputmode="numeric" required style="direction:ltr;text-align:right"></div>
+      <div class="field"><label class="label" for="pN">اسم الصنف</label><input id="pN" required></div>
+      <div class="field"><label class="label" for="pBr">البراند</label><input id="pBr" list="pBrands"><datalist id="pBrands"></datalist></div>
+      <div class="hint" id="pErr" style="color:var(--danger)"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" type="submit" id="pSave" style="flex:1">حفظ</button>
+        <button class="btn danger sm" type="button" id="pDel">حذف الصنف</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <div class="basket" id="sbar" hidden>
   <div class="wrap">
@@ -361,7 +390,7 @@ $('pinForm').addEventListener('submit', async e => {
   if (!pin) return;
   $('pinOk').disabled = true;
   try {
-    if (pinCtx.kind === 'admin'){ await api('auth', { admin: true, pin }); adminPin = pin; ls.set('adminPin', pin); }
+    if (pinCtx.kind === 'admin'){ await api('auth', { admin: true, pin }); adminPin = pin; ls.set('adminPin', pin); $('tab-settings').hidden = false; }
     else {
       // The PIN alone identifies the branch.
       const r = await api('login', { pin });
@@ -563,11 +592,13 @@ function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false
 let curTab = 'order';
 function showTab(which){
   curTab = which;
-  const board = which === 'board', sales = which === 'sales';
-  $('tab-order').setAttribute('aria-selected', which === 'order'); $('tab-sales').setAttribute('aria-selected', sales); $('tab-board').setAttribute('aria-selected', board);
+  const board = which === 'board', sales = which === 'sales', settings = which === 'settings';
+  $('tab-order').setAttribute('aria-selected', which === 'order'); $('tab-sales').setAttribute('aria-selected', sales); $('tab-board').setAttribute('aria-selected', board); $('tab-settings').setAttribute('aria-selected', settings);
   $('view-order').hidden = which !== 'order'; $('orderTools').style.display = which === 'order' ? 'flex' : 'none';
   $('view-sales').hidden = !sales; $('sbar').hidden = !sales || !branch;
   $('view-board').hidden = !board; $('basket').hidden = which !== 'order';
+  $('view-settings').hidden = !settings;
+  if (settings) openSettings();
   clearInterval(boardTimer);
   if (board){ renderBoard(); loadOrders(); boardTimer = setInterval(() => { if (!document.hidden) loadOrders(); }, 30000); }
   if (sales) openSales();
@@ -575,6 +606,7 @@ function showTab(which){
 $('tab-order').addEventListener('click', () => showTab('order'));
 $('tab-sales').addEventListener('click', () => showTab('sales'));
 $('tab-board').addEventListener('click', () => showTab('board'));
+$('tab-settings').addEventListener('click', () => showTab('settings'));
 
 // Purchasing board
 let fRange = 'today', fStatus = 'new', delArmed = null;
@@ -869,6 +901,122 @@ function salesXlsx(r){
   sheet([['التاريخ', 'الفرع', 'الحبات'], ...B.flatMap(([n, o]) => Object.keys(o.days).sort().map(d => [d, n, o.days[d]]))], 'يومي');
   XLSX.writeFile(wb, `مبيعات الفروع ${r.month}.xlsx`);
 }
+
+// ---------- Settings (board PIN): add / edit / delete products and their photos ----------
+let stLists = [], stList = 'الأصناف', stProducts = [], stQ = '', stEdit = null, stImg = '';
+async function adminCall(fn, body){
+  const r = await call(fn, Object.assign({ admin: true, pin: adminPin }, body));
+  if (r && r.error) throw Object.assign(new Error(r.error), { status: r.status, code: r.error });
+  return r;
+}
+async function openSettings(){
+  const v = $('view-settings');
+  if (!adminPin){
+    v.innerHTML = `<div class="notice"><b>الإعدادات خاصة بالمسؤول.</b><br><button class="btn" id="stLogin" style="margin-top:10px">إدخال رمز اللوحة</button></div>`;
+    $('stLogin').onclick = async () => { if (await askPin('admin')) openSettings(); };
+    return;
+  }
+  v.innerHTML = '<div class="notice">جاري التحميل…</div>';
+  try {
+    stLists = (await adminCall('adminLists', {})).lists;
+    if (!stLists.some(l => l.tab === stList)) stList = stLists[0].tab;
+    await loadStProducts();
+  } catch (e) {
+    if (e.status === 401){ adminPin = ''; ls.set('adminPin', ''); $('tab-settings').hidden = true; return openSettings(); }
+    v.innerHTML = '<div class="notice">تعذر التحميل. تأكد من الإنترنت.</div>';
+  }
+}
+async function loadStProducts(){
+  stProducts = (await adminCall('adminProducts', { list: stList })).products;
+  renderSettings();
+}
+function renderSettings(){
+  const l = stLists.find(x => x.tab === stList) || {};
+  const q = norm(stQ);
+  const list = stProducts.filter(p => !q || norm(p.n + ' ' + p.br + ' ' + p.b).includes(q));
+  const noPic = stProducts.filter(p => !p.img).length;
+  $('view-settings').innerHTML = `
+  <div class="scard">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <h3 style="font-size:16px">الأصناف والصور</h3>
+      <button class="btn sm" id="stAdd">+ إضافة صنف</button>
+    </div>
+    <label class="field"><span class="label">القائمة</span><select id="stList" class="brandsel">${stLists.map(x => `<option value="${esc(x.tab)}"${x.tab === stList ? ' selected' : ''}>${x.tab === 'الأصناف' ? 'الأصناف الرئيسية (مصدر الصور لكل القوائم)' : esc(x.label)}${x.branches.length ? ' — ' + esc(x.branches.join('، ')) : ''}</option>`).join('')}</select></label>
+    <div class="hint">${stProducts.length} صنف · ${noPic} بدون صورة${stList === 'الأصناف' ? '' : ' (الصنف بدون صورة هنا ياخذ صورته من الأصناف الرئيسية)'}</div>
+    <label class="search"><input id="stQ" type="search" placeholder="ابحث باسم الصنف أو البراند أو الباركود" value="${esc(stQ)}" autocomplete="off"></label>
+  </div>
+  <div class="slist">${list.map(p => `<div class="srow strow" data-b="${esc(p.b)}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy">` : '<div class="ni nopic">📷</div>'}
+    <div class="t"><span class="nm">${esc(p.n)}</span><small>${esc(p.br)} · ${esc(p.b)}</small></div>
+    <button class="btn ghost sm" data-edit="${esc(p.b)}">تعديل</button></div>`).join('') || '<div class="notice">ما فيه أصناف بهذا البحث.</div>'}</div>`;
+  $('stList').onchange = async e => { stList = e.target.value; stQ = ''; $('view-settings').innerHTML = '<div class="notice">جاري التحميل…</div>'; await loadStProducts(); };
+  $('stQ').oninput = e => { stQ = e.target.value; const pos = e.target.selectionStart; renderSettings(); const i = $('stQ'); i.focus(); i.setSelectionRange(pos, pos); };
+  $('stAdd').onclick = () => openProduct(null);
+}
+$('view-settings').addEventListener('click', e => {
+  const b = e.target.closest('[data-edit]') || e.target.closest('.strow');
+  if (!b) return;
+  openProduct(stProducts.find(p => p.b === (b.dataset.edit || b.dataset.b)));
+});
+function setPreview(){
+  $('pPrev').innerHTML = stImg ? `<img src="${esc(stImg)}" alt="">` : '<div class="ni nopic" style="width:96px;height:96px;font-size:28px">📷</div>';
+  $('pNoImg').hidden = !stImg;
+}
+function openProduct(p){
+  stEdit = p || null; stImg = p ? p.img : '';
+  $('pTitle').textContent = p ? 'تعديل صنف' : 'إضافة صنف';
+  $('pSub').textContent = (stLists.find(x => x.tab === stList) || {}).label || '';
+  $('pB').value = p ? p.b : ''; $('pN').value = p ? p.n : ''; $('pBr').value = p ? p.br : '';
+  $('pBrands').innerHTML = [...new Set(stProducts.map(x => x.br).filter(Boolean))].map(b => `<option value="${esc(b)}">`).join('');
+  $('pDel').hidden = !p; $('pErr').textContent = ''; $('pFile').value = '';
+  setPreview();
+  $('pSheet').hidden = false;
+}
+$('pClose').onclick = () => $('pSheet').hidden = true;
+$('pSheet').addEventListener('click', e => { if (e.target === $('pSheet')) $('pSheet').hidden = true; });
+$('pNoImg').onclick = () => { stImg = ''; setPreview(); };
+// A phone photo is shrunk to a small JPEG so it fits in one sheet cell.
+$('pFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const bmp = await createImageBitmap(f);
+    let size = 360, q = 0.8, out = '';
+    for (let i = 0; i < 8; i++){
+      const s = Math.min(1, size / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas'); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0, c.width, c.height);
+      out = c.toDataURL('image/jpeg', q);
+      if (out.length <= 46000) break;
+      if (q > 0.5) q -= 0.1; else size = Math.round(size * 0.8);
+    }
+    stImg = out; setPreview();
+  } catch { $('pErr').textContent = 'تعذر قراءة الصورة، جرّب صورة ثانية.'; }
+};
+$('pForm').onsubmit = async e => {
+  e.preventDefault();
+  const b = $('pB').value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim(), n = $('pN').value.trim(), br = $('pBr').value.trim();
+  if (!b || !n){ $('pErr').textContent = 'اكتب الباركود واسم الصنف.'; return; }
+  const btn = $('pSave'); btn.disabled = true; btn.textContent = 'جاري الحفظ…';
+  try {
+    const r = await adminCall('adminSaveProduct', { list: stList, orig: stEdit ? stEdit.b : '', b, n, br, img: stImg });
+    $('pSheet').hidden = true;
+    toast(r.added ? 'تمت إضافة الصنف ✓' : 'تم حفظ التعديل ✓');
+    Object.keys(productCache).forEach(k => delete productCache[k]);   // promoters' lists reload with the change
+    await loadStProducts();
+  } catch (err) {
+    $('pErr').textContent = err.code === 'duplicate' ? 'هذا الباركود موجود في القائمة.' : err.code === 'image_too_big' ? 'الصورة كبيرة، جرّب صورة ثانية.' : 'تعذر الحفظ. تأكد من الإنترنت.';
+  } finally { btn.disabled = false; btn.textContent = 'حفظ'; }
+};
+$('pDel').onclick = async () => {
+  if (!stEdit || !confirm(`حذف «${stEdit.n}» من القائمة؟`)) return;
+  try {
+    await adminCall('adminDeleteProduct', { list: stList, b: stEdit.b });
+    $('pSheet').hidden = true; toast('تم حذف الصنف');
+    Object.keys(productCache).forEach(k => delete productCache[k]);
+    await loadStProducts();
+  } catch { $('pErr').textContent = 'تعذر الحذف. تأكد من الإنترنت.'; }
+};
+if (adminPin) $('tab-settings').hidden = false;
+if (new URLSearchParams(location.search).get('view') === 'settings') { $('tab-settings').hidden = false; setTimeout(() => showTab('settings'), 0); }
 
 // ---------- Install as an app ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
