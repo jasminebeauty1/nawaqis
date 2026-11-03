@@ -95,6 +95,24 @@ main{padding-block:18px 40px;display:flex;flex-direction:column;gap:18px}
 .lock input{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:10px;font-size:22px;text-align:center;letter-spacing:.3em;direction:ltr;width:100%}
 .err{color:var(--danger);font-size:13px;min-height:1.2em}
 .note{font-size:12.5px;color:var(--muted);text-align:center}
+/* Plain-language reading aids: a summary at the top, a "how to read" line under each section, a status per branch. */
+.sum{background:var(--surface);border:1px solid var(--line);border-inline-start:5px solid var(--coral);border-radius:var(--r);padding:14px 18px}
+.sum h2{font-size:16.5px;margin-bottom:8px}
+.sum ul{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:4px;font-size:15px}
+.sum b{font-variant-numeric:tabular-nums}
+.how{font-size:13px;color:var(--muted);margin:-6px 0 14px}
+.br{grid-template-columns:minmax(110px,170px) 1fr auto}
+.br .n{white-space:normal;line-height:1.35}
+.br .n small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.bar .pace{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55}
+.tag{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:999px;margin-inline-start:4px}
+.tag.hit{background:var(--ok-soft);color:var(--ok)}
+.tag.on{background:var(--accent-soft);color:var(--accent)}
+.tag.low{background:var(--coral-soft);color:var(--coral)}
+.legend .pc{display:inline-block;width:2px;height:12px;background:var(--ink);opacity:.55;margin-inline-end:6px;vertical-align:-2px}
+.top .sh{color:var(--muted);font-weight:400;font-size:12px;margin-inline-start:6px}
+.kpi .h{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4}
+.kpi.hero .h{color:var(--accent-ink);opacity:.75}
 </style>
 </head>
 <body>
@@ -123,20 +141,24 @@ main{padding-block:18px 40px;display:flex;flex-direction:column;gap:18px}
   </form>
 
   <div id="report" hidden>
-    <section class="kpis" id="kpis"></section>
+    <section class="sum" id="sum"></section>
+    <section class="kpis" id="kpis" style="margin-top:18px"></section>
     <div class="grid2" style="margin-top:18px">
       <section class="card">
         <h2>الفروع مقابل التارقت <small id="tgtNote"></small></h2>
+        <p class="how">الشريط يمتلئ كل ما قرب الفرع من تارقت الشهر. الخط الغامق هو المفروض يوصله الفرع لين اليوم، فإذا الشريط قبل الخط فالفرع متأخر.</p>
         <div class="brs" id="brs"></div>
-        <div class="legend"><span><i style="background:var(--ok)"></i>حقق التارقت</span><span><i style="background:var(--accent)"></i>في الطريق</span><span><i style="background:var(--coral)"></i>متأخر عن وتيرة الشهر</span></div>
+        <div class="legend"><span><i style="background:var(--ok)"></i>حقق التارقت</span><span><i style="background:var(--accent)"></i>على الوتيرة</span><span><i style="background:var(--coral)"></i>متأخر</span><span><span class="pc"></span>المفروض لين اليوم</span></div>
       </section>
       <section class="card">
         <h2>المبيعات اليومية <small>كل الفروع</small></h2>
+        <p class="how">كل عمود = مجموع القطع اللي انباعت في يوم واحد في كل الفروع. مرّر على العمود تشوف الرقم.</p>
         <div id="trend"></div>
       </section>
     </div>
     <section class="card" style="margin-top:18px">
       <h2>أكثر الأصناف مبيعاً <small id="topNote"></small></h2>
+      <p class="how">أكثر 10 أصناف انباعت هذا الشهر في كل الفروع، والنسبة هي حصة الصنف من إجمالي المبيعات.</p>
       <ol class="top" id="top"></ol>
     </section>
     <p class="note" id="stamp" style="margin-top:14px"></p>
@@ -229,29 +251,50 @@ function render(){
   const pace = (isNow ? Number(rep.today.slice(8, 10)) : daysInMonth) / daysInMonth;
 
   const split = G.map(g => `${g.key === 'mk' ? 'مخازن' : 'جاسمين'} ${fmt(Object.values(g.branches).reduce((s, b) => s + b.pieces, 0))}`).join(' · ');
+  const dayNo = isNow ? Number(rep.today.slice(8, 10)) : daysInMonth;
+  const totalTarget = all.reduce((s, x) => s + (x.g.target || 0), 0);
+  const projected = isNow && dayNo ? Math.round(total / dayNo * daysInMonth) : total;
+  // One status per branch, used by the summary, the bars and their tags.
+  all.forEach(x => {
+    const t = x.g.target, pct = t ? x.b.pieces / t : 0;
+    x.pct = pct;
+    x.st = !t ? '' : x.b.pieces >= t ? 'hit' : pct < pace * 0.8 ? 'low' : 'on';
+  });
+  const cnt = st => all.filter(x => x.st === st).length;
+  const lagging = all.filter(x => x.st === 'low' && x.b.pieces).sort((a, b) => a.pct - b.pct);   // silent branches get their own line
+  const silent = all.filter(x => !x.b.pieces);
   $('sub').textContent = monthName(rep.month);
+  $('sum').innerHTML = `<h2>الخلاصة</h2><ul>
+    <li>${isNow ? `لين اليوم (${dayName(rep.today)}) مرّ <b>${Math.round(pace * 100)}%</b> من الشهر،` : 'خلال الشهر كامل'} وانباع <b>${fmt(total)}</b> قطعة${totalTarget ? ` من تارقت الشهر الكلي <b>${fmt(totalTarget)}</b> قطعة (<b>${Math.round(total / totalTarget * 100)}%</b>)` : ''}.</li>
+    ${isNow && totalTarget ? `<li>إذا استمر البيع بنفس الوتيرة، المتوقع نهاية الشهر <b>${fmt(projected)}</b> قطعة، يعني <b>${Math.round(projected / totalTarget * 100)}%</b> من التارقت.</li>` : ''}
+    ${totalTarget ? `<li>من ${all.length} فرع: <b>${cnt('hit')}</b> حقق التارقت، <b>${cnt('on')}</b> ${isNow ? 'على الوتيرة' : 'قريب منه'}، و<b>${cnt('low')}</b> متأخر${lagging.length ? `، وأكثرهم تأخر: ${lagging.slice(0, 3).map(x => `${esc(x.n)} (${Math.round(x.pct * 100)}%)`).join('، ')}` : ''}.</li>` : ''}
+    ${best && best.b.pieces ? `<li>أعلى فرع: <b>${esc(best.n)}</b> بـ <b>${fmt(best.b.pieces)}</b> قطعة.</li>` : ''}
+    ${silent.length ? `<li>${silent.length === 1 ? 'فرع واحد ما سجل' : silent.length + ' فروع ما سجلت'} أي مبيعات هذا الشهر: ${silent.slice(0, 5).map(x => esc(x.n)).join('، ')}${silent.length > 5 ? '…' : ''}.</li>` : ''}
+  </ul>`;
   $('kpis').innerHTML = `
-    <div class="kpi hero"><span class="l">إجمالي المبيعات</span><span class="v">${fmt(total)}</span><span class="s">قطعة · ${esc(split)}</span></div>
-    <div class="kpi"><span class="l">متوسط اليوم</span><span class="v">${fmt(dayKeys.length ? Math.round(total / dayKeys.length) : 0)}</span><span class="s">قطعة في ${dayKeys.length} يوم مسجل</span></div>
-    <div class="kpi"><span class="l">الفروع اللي سجلت</span><span class="v">${active}<span style="font-size:16px;color:var(--muted)"> / ${all.length}</span></span><span class="s">${all.length - active ? (all.length - active) + ' فرع بدون مبيعات' : 'كل الفروع سجلت'}</span></div>
-    <div class="kpi"><span class="l">أعلى فرع</span><span class="v" style="font-size:20px">${best && best.b.pieces ? esc(best.n) : '—'}</span><span class="s">${best && best.b.pieces ? fmt(best.b.pieces) + ' قطعة · ' + esc(best.g.key === 'mk' ? 'مخازن العناية' : 'جاسمين') : 'لا توجد مبيعات'}</span></div>`;
+    <div class="kpi hero"><span class="l">إجمالي المبيعات</span><span class="v">${fmt(total)}</span><span class="s">قطعة · ${esc(split)}</span><span class="h">كل القطع المسجلة في الشهر من كل الفروع</span></div>
+    <div class="kpi"><span class="l">متوسط اليوم</span><span class="v">${fmt(dayKeys.length ? Math.round(total / dayKeys.length) : 0)}</span><span class="s">قطعة في ${dayKeys.length} يوم مسجل</span><span class="h">مجموع الشهر ÷ الأيام اللي فيها مبيعات</span></div>
+    ${isNow && totalTarget ? `<div class="kpi"><span class="l">المتوقع نهاية الشهر</span><span class="v">${fmt(projected)}</span><span class="s">${Math.round(projected / totalTarget * 100)}% من التارقت الكلي</span><span class="h">لو استمر البيع بنفس وتيرة الأيام اللي فاتت</span></div>` : ''}
+    <div class="kpi"><span class="l">الفروع اللي سجلت</span><span class="v">${active}<span style="font-size:16px;color:var(--muted)"> / ${all.length}</span></span><span class="s">${all.length - active ? (all.length - active) + ' فرع بدون مبيعات' : 'كل الفروع سجلت'}</span><span class="h">فروع سجلت مبيعات ولو يوم واحد</span></div>
+    <div class="kpi"><span class="l">أعلى فرع</span><span class="v" style="font-size:20px">${best && best.b.pieces ? esc(best.n) : '—'}</span><span class="s">${best && best.b.pieces ? fmt(best.b.pieces) + ' قطعة · ' + esc(best.g.key === 'mk' ? 'مخازن العناية' : 'جاسمين') : 'لا توجد مبيعات'}</span><span class="h">أكثر فرع باع قطع هذا الشهر</span></div>`;
 
   const targets = [...new Set(G.map(g => g.target).filter(Boolean))];
   $('tgtNote').textContent = targets.length === 1 ? `التارقت ${fmt(targets[0])} قطعة لكل فرع في الشهر` : '';
   const max = Math.max(...G.map(g => g.target), ...all.map(x => x.b.pieces), 1);
+  const TAG = { hit: 'حقق التارقت', on: isNow ? 'على الوتيرة' : 'ما حقق', low: 'متأخر' };
   $('brs').innerHTML = G.map(g => {
-    const list = Object.entries(g.branches).sort((a, b) => b[1].pieces - a[1].pieces);
-    const sum = list.reduce((s, [, b]) => s + b.pieces, 0);
-    const value = list.reduce((s, [, b]) => s + (b.value || 0), 0);
+    const list = all.filter(x => x.g === g).sort((a, b) => b.b.pieces - a.b.pieces);
+    const sum = list.reduce((s, x) => s + x.b.pieces, 0);
+    const value = list.reduce((s, x) => s + (x.b.value || 0), 0);
     return `<div class="grp"><span class="gn"><i style="background:${g.color}"></i>${esc(g.name)}</span><span class="gs">${fmt(sum)} قطعة${value ? ' · ' + fmt(Math.round(value)) + ' ريال' : ''}</span></div>` +
-      list.map(([name, b]) => {
-        const pct = g.target ? b.pieces / g.target : 0;
-        const cls = g.target && b.pieces >= g.target ? 'hit' : (g.target && pct < pace * 0.8 ? 'low' : '');
+      list.map(({ n: name, b, pct, st }) => {
+        // With a target the bar is the share of it (full = target reached); without one, relative to the biggest branch.
+        const width = g.target ? Math.min(100, pct * 100) : b.pieces / max * 100;
         const last = Object.keys(b.days || {}).sort().pop();
-        return `<div class="br" title="${last ? 'آخر تسجيل: ' + dayName(last) : 'لم يسجل'}">
-          <span class="n">${esc(name)}</span>
-          <span class="bar"><i class="${cls}" style="width:${Math.min(100, b.pieces / max * 100)}%"></i></span>
-          <span class="q"><b>${fmt(b.pieces)}</b>${g.target ? ` <span>· ${Math.round(pct * 100)}%</span>` : ''}</span>
+        return `<div class="br">
+          <span class="n">${esc(name)}${st ? `<span class="tag ${st}">${TAG[st]}</span>` : ''}<small>${last ? 'آخر تسجيل: ' + dayName(last) : 'ما سجل هذا الشهر'}</small></span>
+          <span class="bar"><i class="${st === 'on' ? '' : st}" style="width:${width}%"></i>${g.target && isNow ? `<span class="pace" style="right:${Math.min(100, pace * 100)}%"></span>` : ''}</span>
+          <span class="q"><b>${fmt(b.pieces)}</b>${g.target ? ` <span>من ${fmt(g.target)} · ${Math.round(pct * 100)}%</span>` : ''}</span>
         </div>`;
       }).join('');
   }).join('') + (rep.makhazen && rep.makhazen.error ? '<div class="note">تعذر جلب مبيعات مخازن العناية الآن.</div>' : '') || '<div class="empty">لا توجد فروع</div>';
@@ -266,7 +309,7 @@ function render(){
   })));
   const top = Object.values(items).sort((a, b) => b.q - a.q).slice(0, 10);
   $('topNote').textContent = top.length ? `من ${fmt(Object.keys(items).length)} صنف انباع` : '';
-  $('top').innerHTML = top.map((t, i) => `<li><span class="rk">${i + 1}</span><span class="nm">${esc(t.n)}${t.br ? `<small>${esc(t.br)}</small>` : ''}</span><span class="qt">${fmt(t.q)}</span></li>`).join('') || '<li class="empty">لا توجد مبيعات</li>';
+  $('top').innerHTML = top.map((t, i) => `<li><span class="rk">${i + 1}</span><span class="nm">${esc(t.n)}${t.br ? `<small>${esc(t.br)}</small>` : ''}</span><span class="qt">${fmt(t.q)} قطعة${total ? `<span class="sh">${(t.q / total * 100).toFixed(1)}%</span>` : ''}</span></li>`).join('') || '<li class="empty">لا توجد مبيعات</li>';
 
   $('stamp').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-SA-u-nu-latn', { hour: 'numeric', minute: '2-digit' }) + ' · يتحدث تلقائياً كل 5 دقائق';
 }
